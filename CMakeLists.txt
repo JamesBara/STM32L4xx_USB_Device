@@ -30,8 +30,9 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
-# Add STM32CubeMX generated sources
-#dd_subdirectory(cmake/stm32cubemx)
+
+
+add_subdirectory(STM32L4xx)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -41,8 +42,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    main.c
- "inc/usbd.h")
+    
+ "inc/usbd.h" "src/main.c" "src/usbd_hw.c" "inc/usbd_hw.h" "inc/usbd_hw_user_definitions.h")
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -51,16 +52,12 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined symbols
+    
 )
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
-    #stm32cubemx
+    STM32L4xx
 
     # Add user defined libraries
 )
-
-
-# STM32L4XX architecture specific flags
-set(TARGET_FLAGS "-mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard")

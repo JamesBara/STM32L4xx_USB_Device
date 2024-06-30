@@ -29,7 +29,7 @@ set(TARGET_LINKER_SCRIPT "STM32L412.ld")
 set(TARGET_FLAGS "-mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${TARGET_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic -fdata-sections -ffunction-sections") #Not sure if -ffreestanding is needed.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic -fdata-sections -ffunction-sections") # -ffreestanding
 
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -48,4 +48,4 @@ set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp -MMD -MP")
 set(CMAKE_C_LINK_FLAGS "${TARGET_FLAGS}")
 set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} -T \"${CMAKE_SOURCE_DIR}/${TARGET_LINKER_SCRIPT}\"")
 
-set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} -Wl,-Map=${CMAKE_PROJECT_NAME}.map -Wl,--gc-sections -lgcc -Wl,--print-memory-usage") # Not sure if -nostdlib is needed. Create a map file (maybe add --cref to get references? we will see.) and do garbage collection use lgcc library print them memory usage.
+set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} -Wl,-Map=${CMAKE_PROJECT_NAME}.map--cref -Wl,--gc-sections -lgcc -Wl,--print-memory-usage") # -nostdlib.
