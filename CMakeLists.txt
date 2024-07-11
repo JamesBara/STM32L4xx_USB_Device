@@ -33,6 +33,8 @@ add_executable(${CMAKE_PROJECT_NAME})
 
 
 add_subdirectory(STM32L4xx)
+add_subdirectory(usbd_core)
+add_subdirectory(bsp)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -42,8 +44,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    
- "inc/usbd.h" "src/main.c" "src/usbd_hw.c" "inc/usbd_hw.h" "inc/usbd_hw_user_definitions.h")
+    "main.c")
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -58,6 +59,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
     STM32L4xx
-
+    bsp
+    usbd_core
     # Add user defined libraries
 )

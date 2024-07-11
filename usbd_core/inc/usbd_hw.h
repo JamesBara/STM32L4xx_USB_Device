@@ -1,10 +1,7 @@
 #ifndef USBD_HW_H
 #define USBD_HW_H
 
-#include <stddef.h>
-#include <stdbool.h>
 #include "stm32l4xx.h"
-#include "stm32_assert.h"
 
 #define PMA_BASE STM32L4xx_USB_SRAM_BASE
 #define PMA_SIZE (0x400U)
@@ -17,21 +14,6 @@
 #define EP5 5
 #define EP6 6
 #define EP7 7
-
-/*Move it higher turn it to enum.*/
-typedef uint8_t USBD_EVENT;
-#define NO_EVENT 0
-#define RESET_EVENT 1
-#define CTR_EVENT 2
-#define SETUP_EVENT 3
-#define SUSPEND_EVENT 4
-#define WAKEUP_EVENT 5
-#define PMAOVR_EVENT 6
-#define SOF_EVENT 7
-#define ESOF_EVENT 8
-#define LPM_L1_EVENT 9
-#define ERROR_EVENT 10
-
 
 /*Masks for the whole endpoint register per bit type.*/
 #define USBD_EP_RW (USB_EP_SETUP | USB_EP_TYPE | USB_EP_KIND | USB_EP_EA)
@@ -228,41 +210,6 @@ typedef uint8_t USBD_EVENT;
 	*USBD_EP_REG(0) = USBD_EP_SET_TOGGLE(ep_val, (USB_EP_STAT_RX_STALL | USB_EP_STAT_TX_STALL), (USB_EP_STAT_RX | USB_EP_STAT_TX)); \
 }while(0)
 
-typedef struct
-{
-	void (*correct_transfer)(void* param); /*hw endpoint callback*/
-	void (*pmaovr)(void);
-	void (*error)(void);
-	void (*wakeup)(void);
-	void (*suspend)(void);
-	void (*reset)(void);
-	void (*sof)(void);
-	void (*esof)(void);
-	void (*lpm_l1)(void);
-}usbd_hw_driver;
-
-__STATIC_INLINE void usbd_hw_config(usbd_hw_driver* me, void (*pma_ovr)(void), void (*error)(void),
-									void (*wakeup)(void), void (*suspend)(void), void (*reset)(void), 
-									void (*sof)(void), void (*esof)(void), void (*lpm_l1)(void))	
-{
-	ASSERT(me != NULL);
-	ASSERT(error != NULL);
-	ASSERT(pma_ovr != NULL);
-	ASSERT(wakeup != NULL);
-	ASSERT(suspend != NULL);
-	ASSERT(reset != NULL);
-	ASSERT(sof != NULL);
-	ASSERT(esof != NULL);
-	me->pmaovr = pma_ovr;
-	me->error = error;
-	me->wakeup = wakeup;
-	me->suspend = suspend;
-	me->reset = reset;
-	me->sof = sof;
-	me->esof = esof;
-	me->lpm_l1 = lpm_l1;
-}
-
 __STATIC_INLINE void usbd_dev_error(const char* file, int line, const char* func, const char* val)
 {
     UNUSED(file);
@@ -277,16 +224,5 @@ __STATIC_INLINE void usbd_dev_error(const char* file, int line, const char* func
 }
 
 #define USBD_DEV_ERR(param) usbd_dev_error(__FILE__, __LINE__, __func__, #param)
-
-
-
-
-
-//USBD_EVENT usbd_hw_poll_istr(usbd_hw_driver* me, usbd_ep_driver *ep_drv);
-
-
-
-
-
 
 #endif /*USBD_HW_H*/

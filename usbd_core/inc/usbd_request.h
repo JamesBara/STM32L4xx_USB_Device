@@ -1,9 +1,7 @@
 #ifndef USBD_REQUEST_H
 #define USBD_REQUEST_H
 
-#include <stddef.h>
 #include "stm32l4xx.h"
-#include "stm32_assert.h"
 
 #define USBD_REQUEST_DIRECTION (0x1UL << 7)
 #define USBD_REQUEST_DIRECTION_IN (0x1UL << 7)
