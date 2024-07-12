@@ -51,7 +51,7 @@ static void (*cur_ep_handler)(void);
 
 static struct usbd_queue
 {
-	enum usbd_event buffer[USBD_MAX_EVENT];
+	enum usbd_event buffer[USBD_MAX_EVENT + 1];
 	uint32_t head;
 	uint32_t tail;
 }queue;
@@ -702,7 +702,7 @@ static void usbd_event_generator(void)
 	{
 		e = NONE;
 	}
-
+	
 	usbd_event_enqueue(e);
 	USB->ISTR = istr;
 }
@@ -984,10 +984,15 @@ void usbd_core_init(usbd_core_config *conf)
 
 void usbd_core_run(void)
 {
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	__ISB();
+	__DSB();
 	enum usbd_event e = usbd_event_dequeue();
+	__enable_irq();
+	__set_PRIMASK(primask);
 	usbd_device_event_handler(e);
 }
-
 
 void USB_IRQHandler(void)
 {
