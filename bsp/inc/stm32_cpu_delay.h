@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "stm32l4xx.h"
 
-/*@todo There is a better way. Modify this later.*/
+
 __STATIC_FORCEINLINE void cpu_busy_wait(uint32_t max)
 {
   __ASM volatile (
