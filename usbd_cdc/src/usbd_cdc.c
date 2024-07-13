@@ -415,12 +415,12 @@ static void class_request(usbd_setup_packet_type setup)
     {
         case USBD_CDC_SET_LINE_CODING:
         {
-            usbd_prepare_data_out_stage(&line_coding, sizeof(line_coding), set_line_coding_cplt);
+            usbd_prepare_data_out_stage((uint8_t*)&line_coding, sizeof(line_coding), set_line_coding_cplt);
             break;
         }
         case USBD_CDC_GET_LINE_CODING:
         {
-            usbd_prepare_data_in_stage(&line_coding, sizeof(line_coding));
+            usbd_prepare_data_in_stage((uint8_t*)&line_coding, sizeof(line_coding));
             break;
         }
         case USBD_CDC_SET_CONTROL_LINE_STATE:
@@ -458,6 +458,6 @@ static void usbd_ep2_out_handler(void)
 {
     USBD_EP_CLEAR_CTR_RX(EP2);
     cdc_out_cnt = USBD_PMA_GET_RX_COUNT(EP2);
-    usbd_pma_read(ADDR2_RX, &cdc_out_buffer, cdc_out_cnt);
+    usbd_pma_read(ADDR2_RX, cdc_out_buffer, cdc_out_cnt);
     USBD_EP_SET_RX_VALID(EP2);
 }
