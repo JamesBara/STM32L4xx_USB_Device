@@ -22,4 +22,9 @@
 #define USBD_CDC_GET_LINE_CODING (0x21U)
 #define USBD_CDC_SET_CONTROL_LINE_STATE (0x22U)
 
+
+
+usbd_core_config* cdc_init(void);
+
+
 #endif /*USBD_CDC_H*/

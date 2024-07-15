@@ -4,11 +4,6 @@ add_library(usbd_core INTERFACE)
 
 enable_language(C)
 
-target_compile_definitions(usbd_core INTERFACE
-    $<$<CONFIG:Debug>:DEBUG>
-)
-
-
 target_include_directories(usbd_core INTERFACE
     inc
 )

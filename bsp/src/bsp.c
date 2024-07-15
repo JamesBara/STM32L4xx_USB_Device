@@ -90,17 +90,17 @@ void bsp_init(void)
 	SET(RCC->APB1ENR1, RCC_APB1ENR1_PWREN);
 	while (!GET(RCC->APB1ENR1, RCC_APB1ENR1_PWREN));
 	/*Configure the systick*/
+	tick = 0;
 	SysTick_Config(SystemCoreClock / 1000);
 	/*Set systick interrupt priority to the lowest.*/
 	NVIC_SetPriority(SysTick_IRQn, 0xFU);
 	/*Enable systick interrupt.*/
 	NVIC_EnableIRQ(SysTick_IRQn);
-	tick = 0;
 	/*Set the max frequency.*/
 	set_cpu_max_freq();
 	/*Reconfgure systick.*/
-	SysTick_Config(SystemCoreClock / 1000);
 	tick = 0;
+	SysTick_Config(SystemCoreClock / 1000);
 	/*Enable prefetch.*/
 	SET(FLASH->ACR, FLASH_ACR_PRFTEN);
 	/*Enable gpioa clock.*/

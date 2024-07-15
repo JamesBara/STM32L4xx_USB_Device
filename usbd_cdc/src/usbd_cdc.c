@@ -144,7 +144,7 @@ static const struct __PACKED usbd_cdc_configuration_descriptor conf_desc =
     {
         9,
         USBD_REQUEST_DESC_CONFIGURATION,
-        0, /*@todo*/
+        67,
         2,
         1,
         0,
@@ -352,7 +352,23 @@ static bool is_endpoint_valid(uint8_t num, uint8_t dir)
 
 static void clear_stall(uint8_t num, uint8_t dir)
 {
-
+    if (dir)
+    {
+        USBD_EP_CLEAR_TX_STALL(num);
+        if (num == 1)
+        {
+            usbd_ep1_in_handler();
+        }
+        if (num == 2)
+        {
+            usbd_ep2_in_handler();
+        }
+    }
+    else
+    {
+        USBD_EP_CLEAR_RX_STALL(num);
+        usbd_ep2_out_handler();
+    }
 }
 
 static uint8_t* get_device_descriptor(void)
@@ -460,4 +476,9 @@ static void usbd_ep2_out_handler(void)
     cdc_out_cnt = USBD_PMA_GET_RX_COUNT(EP2);
     usbd_pma_read(ADDR2_RX, cdc_out_buffer, cdc_out_cnt);
     USBD_EP_SET_RX_VALID(EP2);
+}
+
+usbd_core_config* cdc_init(void)
+{
+    return &usbd_cdc_conf;
 }

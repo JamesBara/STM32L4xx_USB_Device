@@ -9,11 +9,11 @@
 
 #ifndef ADDR0_TX
     #define ADDR0_TX_OFFSET 64
-	#define ADDR0_TX ((uint16_t*) PMA_BASE + ADDR0_TX_OFFSET)
+	#define ADDR0_TX ((uint16_t*) (PMA_BASE + ADDR0_TX_OFFSET))
 #endif
 #ifndef ADDR0_RX
     #define ADDR0_RX_OFFSET 128
-	#define ADDR0_RX ((uint16_t*) PMA_BASE + ADDR0_RX_OFFSET)
+	#define ADDR0_RX ((uint16_t*) (PMA_BASE + ADDR0_RX_OFFSET))
 #endif
 #ifndef COUNT0_RX 
 	#define COUNT0_RX USBD_FS_MAXPACKETSIZE
@@ -58,6 +58,6 @@ void usbd_prepare_data_out_stage(uint8_t* buf, uint32_t cnt, void (*rx_cplt)(voi
 void usbd_prepare_status_in_stage(void);
 
 void usbd_core_init(usbd_core_config *conf);
-void usbd_core_run(void);
+//void usbd_core_run(void);
 
 #endif /*USBD_CORE_H*/

@@ -132,7 +132,7 @@
 	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, USB_EP_STAT_TX_STALL, USB_EP_STAT_TX); \
 }while(0)
 
-#define USBD_EP_SET_RX_STALL(ep_num) do \
+#define USBD_EP_SET_RX_STALL(ep) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	if (GET(ep, USB_EP_STAT_RX) != USB_EP_STAT_RX_DISABLED) \
@@ -141,7 +141,7 @@
 	}\
 }while(0)
 
-#define USBD_EP_CLEAR_TX_STALL(ep_num) do \
+#define USBD_EP_CLEAR_TX_STALL(ep) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	if (GET(ep, USB_EP_STAT_TX) == USB_EP_STAT_TX_STALL) \
@@ -219,7 +219,7 @@ __STATIC_INLINE void usbd_dev_error(const char* file, int line, const char* func
 	USBD_EP0_SET_STALL();
 
     #ifndef NDEBUG
-        __BKPT(0);
+       // __BKPT(0);
     #endif /*NDEBUG*/
 }
 

@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+#ignore those for now. Add them later.
+launch.vs.json
+CMakePresets.json

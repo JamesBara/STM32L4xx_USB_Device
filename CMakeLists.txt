@@ -52,10 +52,26 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     inc
 )
 
+
+
 # Add project symbols (macros)
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    
+target_compile_definitions(STM32L4xx INTERFACE
+     $<$<CONFIG:Debug>:DEBUG>
+     STM32L412
 )
+
+target_compile_definitions(usbd_core INTERFACE
+    $<$<CONFIG:Debug>:DEBUG>
+)
+
+target_compile_definitions(usbd_cdc INTERFACE
+    $<$<CONFIG:Debug>:DEBUG>
+)
+
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+     $<$<CONFIG:Debug>:DEBUG>
+)
+
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
