@@ -14,7 +14,7 @@
 #define ADDR2_RX ((uint16_t*) PMA_BASE + ADDR2_RX_OFFSET)
 #endif
 #ifndef COUNT2_RX 
-#define COUNT2_RX USBD_FS_MAXPACKETSIZE
+#define COUNT2_RX USBD_FS_MAX_PACKET_SIZE
 #define EP2_COUNT COUNT2_RX 
 #endif
 

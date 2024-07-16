@@ -164,12 +164,18 @@ static void usbd_setup_stage(void)
 {
 	usbd_setup_packet_type setup = {0};
 	uint16_t count = USBD_PMA_GET_RX_COUNT(EP0);
-	ASSERT(count == sizeof(usbd_setup_packet_type));
+	
+	if(count != USBD_SETUP_PACKET_SIZE)
+	{
+		USBD_ERROR_LOG(Wrong setup packet size);
+		USBD_EP0_SET_STALL();
+	}
+
 	usbd_pma_read(ADDR0_RX, (uint8_t*)&setup, count);
 
 	packet_dbg[packet_dbg_cnt] = setup;
 
-	if (packet_dbg_cnt >= 8)
+	if (packet_dbg_cnt >= 13)
 	{
 		__BKPT(0);
 	}
@@ -179,16 +185,20 @@ static void usbd_setup_stage(void)
 
 static void usbd_data_in_stage(void)
 {
-	uint32_t cnt = MIN(USBD_FS_MAXPACKETSIZE, ep0_cnt);
+	uint32_t cnt = MIN(EP0_COUNT, ep0_cnt);
 	/*Decrement the leftover bytes.*/
 	ep0_cnt -= cnt;
-	
+	/*If it's a short packet the opposite direction is set to NAK.*/
+	if(ep0_cnt < EP0_COUNT)
+	{
+		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_NAK);	
+	}
 	/*If there is no leftover data, Data In stage is completed.*/
 	if (!ep0_cnt)
 	{
 		USBD_EP_SET_KIND(EP0);
 		stage = usbd_status_out_stage;
-		USBD_EP_SET_RX_VALID(EP0);
+		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
 		return;
 	}
 	/*Increment the buffer.*/
@@ -196,18 +206,23 @@ static void usbd_data_in_stage(void)
 	/*Copy a packet to usb sram*/
 	USBD_PMA_SET_TX_COUNT(EP0, MIN(EP0_COUNT, ep0_cnt));
 	usbd_pma_write(ep0_buf, ADDR0_TX, MIN(EP0_COUNT, ep0_cnt));
-	USBD_EP_SET_TX_VALID(EP0);
+	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
 static void usbd_data_out_stage(void)
 {
 	/*Get the rx count and protect from underflow.*/
 	uint32_t cnt = MIN(USBD_PMA_GET_RX_COUNT(EP0), ep0_cnt);
-	
+
 	usbd_pma_read(ADDR0_TX, ep0_buf, cnt);
-	USBD_EP_SET_RX_VALID(EP0);
+	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
 	/*Decrement the leftover bytes.*/
 	ep0_cnt -= cnt;
+
+	if (ep0_cnt < EP0_COUNT)
+	{
+		USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_NAK);
+	}
 
 	/*If there is leftover data, increment the buffer pointer.*/
 	if (ep0_cnt)
@@ -230,7 +245,6 @@ static void usbd_status_in_stage(void)
 		SET(USB->DADDR, device_address);
 	}
 
-
 	if (!device_address && cur_state == &addressed_state)
 	{
 		cur_state = &default_state;
@@ -242,14 +256,13 @@ static void usbd_status_in_stage(void)
 	{
 		reception_completed();
 	}
-
-	USBD_PMA_SET_TX_COUNT(EP0, 0);
-	
 	/*Clear the ep0 transfer.*/
 	ep0_buf = NULL;
 	ep0_cnt = 0;
-	stage = usbd_setup_stage;
-	USBD_EP_SET_TX_VALID(EP0);
+	stage = NULL;
+	/*Not sure if this is correct.*/
+	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
+	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_NAK);
 }
 
 static void usbd_status_out_stage(void)
@@ -259,107 +272,175 @@ static void usbd_status_out_stage(void)
 	/*Clear the ep0 transfer.*/
 	ep0_buf = NULL;
 	ep0_cnt = 0;
-	stage = usbd_setup_stage;
-	USBD_EP_SET_RX_VALID(EP0);
+	stage = NULL;
+	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
+	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_NAK);
 }
 
 static void usbd_parse_setup_packet(usbd_setup_packet_type setup)
 {
-    switch(setup.bmRequestType & USBD_REQUEST_TYPE)
+    switch(setup.bmRequestType & USBD_TYPE)
     {
-        case USBD_REQUEST_TYPE_STANDARD:
+        case USBD_TYPE_STANDARD:
         {
             switch(setup.bRequest)
             {
-                case USBD_REQUEST_GET_STATUS:
+                case USBD_GET_STATUS:
                 {
-					ASSERT(cur_state->get_status != NULL);
+					if(cur_state->get_status == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);						
+						USBD_EP0_SET_STALL();
+						return;
+					}
                     cur_state->get_status(setup);
                     break;
                 }
-                case USBD_REQUEST_CLEAR_FEATURE:
+                case USBD_CLEAR_FEATURE:
                 {
-					ASSERT(cur_state->clear_feature != NULL);
+					if(cur_state->clear_feature == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);						
+						USBD_EP0_SET_STALL();
+						return;
+					}
 					cur_state->clear_feature(setup);
                     break;
                 }
-                case USBD_REQUEST_SET_FEATURE:
+                case USBD_SET_FEATURE:
                 {
-					ASSERT(cur_state->set_feature != NULL);
+					if(cur_state->set_feature == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
 					cur_state->set_feature(setup);
                     break;            
                 }
-                case USBD_REQUEST_SET_ADDRESS:
+                case USBD_SET_ADDRESS:
                 {
-					ASSERT(cur_state->set_address != NULL);
+					if(cur_state->set_address == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
 					cur_state->set_address(setup);
                     break;            
                 }
-                case USBD_REQUEST_GET_DESCRIPTOR:
+                case USBD_GET_DESCRIPTOR:
                 {
-					ASSERT(cur_state->get_descriptor != NULL);
+					if(cur_state->get_descriptor == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
 					cur_state->get_descriptor(setup);
                     break;            
                 }
-                case USBD_REQUEST_SET_DESCRIPTOR:
+                case USBD_SET_DESCRIPTOR:
                 {
-					ASSERT(cur_state->set_descriptor != NULL);
+					if(cur_state->set_descriptor == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
                     cur_state->set_descriptor(setup);
                     break;            
                 }
-                case USBD_REQUEST_GET_CONFIGURATION:
+                case USBD_GET_CONFIGURATION:
                 {
-					ASSERT(cur_state->get_configuration != NULL);
+					if(cur_state->get_configuration == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
                     cur_state->get_configuration(setup);
                     break;
                 }
-                case USBD_REQUEST_SET_CONFIGURATION:
+                case USBD_SET_CONFIGURATION:
                 {
-					ASSERT(cur_state->set_configuration != NULL);
-                    cur_state->set_configuration(setup);
+					if(cur_state->set_configuration == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
+					cur_state->set_configuration(setup);
                     break;            
                 }
-                case USBD_REQUEST_GET_INTERFACE:
+                case USBD_GET_INTERFACE:
                 {
-					ASSERT(cur_state->get_interface != NULL);
+					if(cur_state->get_interface == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
                     cur_state->get_interface(setup);
                     break;
                 }
-                case USBD_REQUEST_SET_INTERFACE:
+                case USBD_SET_INTERFACE:
                 {
-					ASSERT(cur_state->set_interface != NULL);
+					if(cur_state->set_interface == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
                     cur_state->set_interface(setup);
                     break;
                 }
-                case USBD_REQUEST_SYNCH_FRAME:
+                case USBD_SYNCH_FRAME:
                 {
-					ASSERT(cur_state->synch_frame != NULL);
+					if(cur_state->synch_frame == NULL)
+					{
+						USBD_ERROR_LOG(Requst not registered. Wrong state?);
+						USBD_EP0_SET_STALL();
+						return;
+					}
                     cur_state->synch_frame(setup);
                     break;
                 }
                 default:
                 {
-                    USBD_DEV_ERR(Invalid bRequest.);
+					USBD_ERROR_LOG(Invalid bRequest);
+					USBD_EP0_SET_STALL();
                     break;
                 }
             }
             break;
         }
-        case USBD_REQUEST_TYPE_CLASS:
+        case USBD_TYPE_CLASS:
         {
-			ASSERT(cur_state->class_request != NULL);
+			if(cur_state->class_request == NULL)
+			{
+				USBD_ERROR_LOG(Requst not registered.);
+				USBD_EP0_SET_STALL();
+				return;
+			}
             cur_state->class_request(setup);
             break;
         }
-        case USBD_REQUEST_TYPE_VENDOR:
+        case USBD_TYPE_VENDOR:
         {
-			ASSERT(cur_state->vendor_request != NULL);
+			if(cur_state->vendor_request == NULL)
+			{
+				USBD_ERROR_LOG(Requst not registered.);
+				USBD_EP0_SET_STALL();
+				return;
+			}
 			cur_state->vendor_request(setup);
             break;
         }
         default:
         {
-            USBD_DEV_ERR(Invalid bmRequestType. Unknown request type.);
+			USBD_ERROR_LOG(Invalid bmRequestType. Unknown request type.);
+			USBD_EP0_SET_STALL();
         }
     }
 }
@@ -368,37 +449,39 @@ static void usbd_get_status(usbd_setup_packet_type setup)
 {
 	uint8_t buf[2] = { 0x0U, 0x0U };
 
-	switch (setup.bmRequestType & USBD_REQUEST_RECIPIENT)
+	switch (setup.bmRequestType & USBD_RECIPIENT)
 	{
-		case USBD_REQUEST_RECIPIENT_DEVICE:
+		case USBD_RECIPIENT_DEVICE:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->get_remote_wakeup != NULL);
 			ASSERT(config->is_selfpowered != NULL);
 			buf[0] = config->get_remote_wakeup() ? 1 << 1 : 0 << 1;
 			buf[0] |= config->is_selfpowered() ? 1 : 0;
-			break;	
+			break;
 		}
-		case USBD_REQUEST_RECIPIENT_INTERFACE:
+		case USBD_RECIPIENT_INTERFACE:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->is_interface_valid != NULL);
 			if(!config->is_interface_valid(setup.wIndex & 0x7FU))
 			{
-				USBD_DEV_ERR(Invalid interface.);
+				USBD_ERROR_LOG(Invalid interface.);
+				USBD_EP0_SET_STALL();
 				return;
 			}
 			break;
 		}
-		case USBD_REQUEST_RECIPIENT_ENDPOINT:
+		case USBD_RECIPIENT_ENDPOINT:
 		{
-			uint8_t ep = (setup.wIndex & 0xF);
-			uint8_t dir =  (setup.wIndex & 0x80) ? 1 : 0;
+			uint8_t ep = (setup.wIndex & USBD_EP_ADDRESS_EP_NUMBER);
+			uint8_t dir =  (setup.wIndex & USBD_EP_ADDRESS_EP_DIRECTION) ? 1 : 0;
 			ASSERT(config != NULL);
 			ASSERT(config->is_endpoint_valid != NULL);
 			if(!config->is_endpoint_valid(ep, dir))
 			{
-				USBD_DEV_ERR(Invalid endpoint.);
+				USBD_ERROR_LOG(Invalid endpoint.);
+				USBD_EP0_SET_STALL();
 				return;
 			}
 			buf[0] = (uint8_t) USBD_EP_GET_STALL(ep, dir) ? 1: 0;
@@ -407,34 +490,36 @@ static void usbd_get_status(usbd_setup_packet_type setup)
 		}
 		default:
 		{
-			USBD_DEV_ERR(Invalid bmRequestType. Unknown recipient);
+			USBD_ERROR_LOG(Invalid bmRequestType. Unknown recipient);
+			USBD_EP0_SET_STALL();
 			return;
 			break;			
 		}
 	}
-	usbd_prepare_data_in_stage(buf, 2);
+	usbd_prepare_data_in_stage(buf, USBD_GET_STATUS_LENGTH);
 }
 
 static void usbd_clear_feature(usbd_setup_packet_type setup)
 {
-	switch (setup.bmRequestType & USBD_REQUEST_RECIPIENT)
+	switch (setup.bmRequestType & USBD_RECIPIENT)
 	{
-		case USBD_REQUEST_RECIPIENT_DEVICE:
+		case USBD_RECIPIENT_DEVICE:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->set_remote_wakeup != NULL);
 			config->set_remote_wakeup(false);
 			break;	
 		}
-		case USBD_REQUEST_RECIPIENT_ENDPOINT:
+		case USBD_RECIPIENT_ENDPOINT:
 		{
-			uint8_t ep = (setup.wIndex & 0xF);
-			uint8_t dir =  (setup.wIndex & 0x80) ? 1 : 0;
+			uint8_t ep = (setup.wIndex & USBD_EP_ADDRESS_EP_NUMBER);
+			uint8_t dir =  (setup.wIndex & USBD_EP_ADDRESS_EP_DIRECTION) ? 1 : 0;
 			ASSERT(config != NULL);
 			ASSERT(config->is_endpoint_valid != NULL);
 			if(!config->is_endpoint_valid(ep, dir))
 			{
-				USBD_DEV_ERR(Invalid endpoint.);
+				USBD_ERROR_LOG(Invalid endpoint.);
+				USBD_EP0_SET_STALL();
 				return;
 			}
 			ASSERT(config->clear_stall != NULL);
@@ -443,7 +528,8 @@ static void usbd_clear_feature(usbd_setup_packet_type setup)
 		}
 		default:
 		{
-			USBD_DEV_ERR(Invalid bmRequestType. Unknown recipient);
+			USBD_ERROR_LOG(Invalid bmRequestType. Unknown recipient);
+			USBD_EP0_SET_STALL();
 			return;
 			break;			
 		}
@@ -453,24 +539,25 @@ static void usbd_clear_feature(usbd_setup_packet_type setup)
 
 static void usbd_set_feature(usbd_setup_packet_type setup)
 {
-	switch (setup.bmRequestType & USBD_REQUEST_RECIPIENT)
+	switch (setup.bmRequestType & USBD_RECIPIENT)
 	{
-		case USBD_REQUEST_RECIPIENT_DEVICE:
+		case USBD_RECIPIENT_DEVICE:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->set_remote_wakeup != NULL);
 			config->set_remote_wakeup(true);
 			break;	
 		}
-		case USBD_REQUEST_RECIPIENT_ENDPOINT:
+		case USBD_RECIPIENT_ENDPOINT:
 		{
-			uint8_t ep = (setup.wIndex & 0xF);
-			uint8_t dir =  (setup.wIndex & 0x80);
+			uint8_t ep = (setup.wIndex & USBD_EP_ADDRESS_EP_NUMBER);
+			uint8_t dir =  (setup.wIndex & USBD_EP_ADDRESS_EP_DIRECTION) ? 1 : 0;
 			ASSERT(config != NULL);
 			ASSERT(config->is_endpoint_valid != NULL);
 			if(!config->is_endpoint_valid(ep, dir))
 			{
-				USBD_DEV_ERR(Invalid endpoint.);
+				USBD_ERROR_LOG(Invalid endpoint.);
+				USBD_EP0_SET_STALL();
 				return;
 			}
 			if (dir)
@@ -485,7 +572,8 @@ static void usbd_set_feature(usbd_setup_packet_type setup)
 		}
 		default:
 		{
-			USBD_DEV_ERR(Invalid bmRequestType. Unknown recipient);
+			USBD_ERROR_LOG(Invalid bmRequestType. Unknown recipient);
+			USBD_EP0_SET_STALL();
 			return;
 			break;			
 		}
@@ -506,7 +594,7 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
 
 	switch ((((setup.wValue) >> 0x8U) & 0xFFU))
 	{
-		case USBD_REQUEST_DESC_DEVICE:
+		case USBD_DESC_TYPE_DEVICE:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->device_descriptor != NULL);
@@ -514,7 +602,7 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
 			cnt = setup.wLength;
 			break;
 		}
-		case USBD_REQUEST_DESC_CONFIGURATION:
+		case USBD_DESC_TYPE_CONFIGURATION:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->configuration_descriptor != NULL);
@@ -522,7 +610,7 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
 			cnt = MIN(setup.wLength, (buf[2] | buf[3] << 8));
 			break;
 		}
-		case USBD_REQUEST_DESC_STRING:
+		case USBD_DESC_TYPE_STRING:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->string_descriptor != NULL);
@@ -530,7 +618,7 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
 			cnt = MIN(setup.wLength, buf[0]);
 			break;
 		}		
-		case USBD_REQUEST_DESC_BOS:
+		case USBD_DESC_TYPE_BOS:
 		{
 			ASSERT(config != NULL);
 			ASSERT(config->bos_descriptor != NULL);
@@ -540,7 +628,8 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
 		}
 		default:
 		{
-			USBD_DEV_ERR(Invalid descriptor request);
+			USBD_ERROR_LOG(Invalid descriptor request.);
+			USBD_EP0_SET_STALL();
 			return;
 			break;
 		}
@@ -562,18 +651,18 @@ static void usbd_get_configuration(usbd_setup_packet_type setup)
 	ASSERT(config != NULL);
 	ASSERT(config->get_configuration != NULL);
 	buf = config->get_configuration();
-	usbd_prepare_data_in_stage(&buf, 1);
+	usbd_prepare_data_in_stage(&buf, USBD_GET_CONFIGURATION_LENGTH);
 }
 
 static void usbd_set_configuration(usbd_setup_packet_type setup)
 {
-	__BKPT(0);
 	uint8_t num = (setup.wValue & 0xFFU);
 	ASSERT(config != NULL);
 	ASSERT(config->is_configuration_valid != NULL);
 	if(!config->is_configuration_valid(num))
 	{
-		USBD_DEV_ERR(Invalid configuration.);
+		USBD_ERROR_LOG(Invalid configuration.);
+		USBD_EP0_SET_STALL();
 		return;
 	}
 	ASSERT(config->set_configuration != NULL);
@@ -590,12 +679,13 @@ static void usbd_get_interface(usbd_setup_packet_type setup)
 	ASSERT(config->is_interface_valid != NULL);
 	if(!config->is_interface_valid(num))
 	{
-		USBD_DEV_ERR(Invalid interface);
+		USBD_ERROR_LOG(Invalid interface.);
+		USBD_EP0_SET_STALL();
 		return;
 	}
 	ASSERT(config->get_interface != NULL);
 	buf = config->get_interface(num);
-	usbd_prepare_data_in_stage(&buf, 1);
+	usbd_prepare_data_in_stage(&buf, USBD_GET_INTERFACE_LENGTH);
 }
 
 static void usbd_set_interface(usbd_setup_packet_type setup)
@@ -606,7 +696,8 @@ static void usbd_set_interface(usbd_setup_packet_type setup)
 	ASSERT(config->is_interface_valid != NULL);
 	if (!config->is_interface_valid(num))
 	{
-		USBD_DEV_ERR(Invalid interface.);
+		USBD_ERROR_LOG(Invalid interface.);
+		USBD_EP0_SET_STALL();		
 	}
 	ASSERT(config->set_interface != NULL);
 	config->set_interface(num, alt);
@@ -619,7 +710,7 @@ static void usbd_synch_frame(usbd_setup_packet_type setup)
 	uint8_t buf[2];
 	/*@todo check if endpoint iso*/
 	/*@todo get frame number*/
-	usbd_prepare_data_in_stage(buf, 2);
+	usbd_prepare_data_in_stage(buf, USBD_SYNCH_FRAME_LENGTH);
 }
 
 static void usbd_class_request(usbd_setup_packet_type setup)
@@ -664,7 +755,6 @@ static void usbd_event_generator(void)
 		uint8_t ep = GET(istr, USB_EP_EA);
 		uint8_t dir = GET(*USBD_EP_REG(ep), USB_EP_CTR_TX) ? 1 : 0;
 		ASSERT(ep_handler[ep][dir] != NULL);
-
 		if (dir)
 		{
 			USBD_EP_CLEAR_CTR_TX(ep);
@@ -675,11 +765,12 @@ static void usbd_event_generator(void)
 		}
 		//cur_ep_handler = ep_handler[ep][dir];
 		//e = CTR;
+		if (USBD_EP_GET_SETUP(ep))
+		{
+			stage = usbd_setup_stage;
+		}
 		ep_handler[ep][dir]();
-		//if (USBD_EP_GET_SETUP(ep))
-		//{
-			//stage = usbd_setup_stage;
-		//}
+
 	}
 
 	if (GET(istr, USB_ISTR_RESET))
@@ -688,10 +779,6 @@ static void usbd_event_generator(void)
 		usbd_reset();
 		//e = RESET;
 	}
-	//if (packet_dbg_cnt >= 8)
-	//{
-		//__BKPT(0);
-	//}
 
 
 #if 0
@@ -742,7 +829,6 @@ static void usbd_reset(void)
 	usbd_register_ep(EP0, USB_EP_TYPE_CONTROL, ADDR0_TX_OFFSET, ADDR0_RX_OFFSET, EP0_COUNT, usbd_ep0_handler, usbd_ep0_handler);
 	ep0_buf = NULL;
 	ep0_cnt = 0;
-	stage = &usbd_setup_stage;
 	cur_state = &default_state;
 	USB->DADDR = USB_DADDR_EF;
 }
@@ -943,9 +1029,17 @@ void usbd_prepare_data_in_stage(uint8_t* buf, uint32_t cnt)
 	ep0_buf = buf;
 	ep0_cnt = cnt;
 	stage = usbd_data_in_stage;
+	if (ep0_cnt >= EP0_COUNT)
+	{
+		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_STALL);
+	}
+	else
+	{
+		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_NAK);
+	}
 	USBD_PMA_SET_TX_COUNT(EP0, MIN(EP0_COUNT, ep0_cnt));
 	usbd_pma_write(ep0_buf, ADDR0_TX, MIN(EP0_COUNT, ep0_cnt));
-	USBD_EP_SET_TX_VALID(EP0);
+	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
 /**
@@ -958,35 +1052,43 @@ void usbd_prepare_data_out_stage(uint8_t* buf, uint32_t cnt, void (*rx_cplt)(voi
 {
 	ASSERT(buf != NULL);
 	ASSERT(cnt);
-	ASSERT(rx_cplt != NULL);
 	ep0_buf = buf;
 	ep0_cnt = cnt;
 	stage = usbd_data_out_stage;
+	/*Store the pointer to the callback*/
 	if (rx_cplt != NULL)
 	{
 		reception_completed = rx_cplt;
 	}
-	USBD_EP_SET_RX_VALID(EP0);
+	/*Prepare the other direction*/
+	if (ep0_cnt > EP0_COUNT)
+	{
+		USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_STALL);
+	}
+	else
+	{
+		USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_NAK);
+	}
+
+	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
 }
 
 /**
  * @brief After parsing a setup packet use this function to acknowledge that the transaction is complete,
- * without need for further data transmission or reception.
+ * without need for further data transmission or reception. In simple english send a zlp.
 */
 void usbd_prepare_status_in_stage(void)
 {
 	stage = usbd_status_in_stage;
 	USBD_PMA_SET_TX_COUNT(EP0, 0);
-	USBD_EP_SET_TX_VALID(EP0);
+	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
-
 
 void usbd_core_init(usbd_core_config *conf)
 {
 	ASSERT(conf != NULL);
 	config = conf;
 	cur_state = &default_state;
-	stage = usbd_setup_stage;
 
 	/*Prepare the hardware.*/
 	__IO uint16_t *reg = (uint16_t*)PMA_BASE;

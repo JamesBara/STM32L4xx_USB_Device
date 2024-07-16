@@ -16,7 +16,7 @@
 	#define ADDR0_RX ((uint16_t*) (PMA_BASE + ADDR0_RX_OFFSET))
 #endif
 #ifndef COUNT0_RX 
-	#define COUNT0_RX USBD_FS_MAXPACKETSIZE
+	#define COUNT0_RX USBD_FS_MAX_PACKET_SIZE
 	#define EP0_COUNT COUNT0_RX 
 #endif
 

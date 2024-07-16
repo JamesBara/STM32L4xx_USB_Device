@@ -3,8 +3,6 @@
 #include "usbd_core.h"
 #include "usbd_cdc.h"
 
-
-
 static uint8_t cdc_out_buffer[EP2_COUNT];
 static uint32_t cdc_out_cnt;
 static bool is_configured;
@@ -15,61 +13,6 @@ struct __PACKED usbd_cdc_line_coding
     uint8_t bCharFormat;
     uint8_t bParityType;
     uint8_t bDataBits;
-};
-
-
-
-struct __PACKED usbd_cdc_device_descriptor
-{
-    uint8_t bLength;
-    uint8_t bDescriptorType;
-    uint16_t bcdUSB;
-    uint8_t bDeviceClass;
-    uint8_t bDeviceSubClass;
-    uint8_t bDeviceProtocol;
-    uint8_t bMaxPacketSize0;
-    uint16_t idVendor;
-    uint16_t idProduct;
-    uint16_t bcdDevice;
-    uint8_t iManufacturer;
-    uint8_t iProduct;
-    uint8_t iSerialNumber;
-    uint8_t bNumConfigurations;
-};
-
-struct __PACKED usbd_std_configuration_descriptor_type
-{
-    uint8_t bLength;
-    uint8_t bDescriptorType;
-    uint16_t wTotalLength;
-    uint8_t bNumInterfaces;
-    uint8_t bConfigurationValue;
-    uint8_t iConfiguration;
-    uint8_t bmAttributes;
-    uint8_t bMaxPower;
-};
-
-struct __PACKED usbd_std_interface_descriptor_type
-{
-    uint8_t bLength;
-    uint8_t bDescriptorType;
-    uint8_t bInterfaceNumber;
-    uint8_t bAlternateSetting;
-    uint8_t bNumEndpoints;
-    uint8_t bInterfaceClass;
-    uint8_t bInterfaceSubClass;
-    uint8_t bInterfaceProtocol;
-    uint8_t iInterface;
-};
-
-struct __PACKED usbd_std_endpoint_descriptor_type
-{
-    uint8_t bLength;
-    uint8_t bDescriptorType;
-    uint8_t bEndpointAddress;
-    uint8_t bmAttributes;
-    uint16_t wMaxPacketSize;
-    uint8_t bInterval;
 };
 
 struct __PACKED usbd_cdc_header_descriptor_type
@@ -106,32 +49,31 @@ struct __PACKED usbd_cdc_union_descriptor_type
     uint8_t bSubordinateInterface0;
 };
 
-
 struct __PACKED usbd_cdc_configuration_descriptor
 {
-    struct usbd_std_configuration_descriptor_type std_conf_desc;
-    struct usbd_std_interface_descriptor_type std_interface_com_desc;
+    usbd_std_configuration_descriptor_type std_conf_desc;
+    usbd_std_interface_descriptor_type std_interface_com_desc;
     struct usbd_cdc_header_descriptor_type header_desc;
     struct usbd_cdc_call_management_descriptor_type call_management_desc;
     struct usbd_cdc_acm_descriptor_type acm_desc;
     struct usbd_cdc_union_descriptor_type union_desc;
-    struct usbd_std_endpoint_descriptor_type std_ep_com_desc;
-    struct usbd_std_interface_descriptor_type std_interface_data_desc;
-    struct usbd_std_endpoint_descriptor_type std_ep_data_desc[2];
+    usbd_std_endpoint_descriptor_type std_ep_com_desc;
+    usbd_std_interface_descriptor_type std_interface_data_desc;
+    usbd_std_endpoint_descriptor_type std_ep_data_desc[2];
 };
 
-static const struct __PACKED usbd_cdc_device_descriptor device_desc =
+static const usbd_std_device_descriptor_type device_desc =
 {
-    18,
-    USBD_REQUEST_DESC_DEVICE,
-    0x0200U,
-    0x2U,
+    USBD_LENGTH_DEVICE_DESC,
+    USBD_DESC_TYPE_DEVICE,
+    USBD_BCD_USB,
+    USBD_CLASS_CDC,
     0x0U,
     0x0U,
     EP0_COUNT,
-    0x0483U,
-    0x5740U,
-    0x0100U,
+    USBD_VID,
+    USBD_PID,
+    USBD_BCD_DEVICE,
     0x0U,
     0x0U,
     0x0U,
@@ -142,23 +84,23 @@ static const struct __PACKED usbd_cdc_configuration_descriptor conf_desc =
 {
     .std_conf_desc =
     {
-        9,
-        USBD_REQUEST_DESC_CONFIGURATION,
+        USBD_LENGTH_CONFIGURATION_DESC,
+        USBD_DESC_TYPE_CONFIGURATION,
         67,
         2,
         1,
         0,
-        0x80U,
-        0xFEU
+        USBD_ATTRIBUTES(0,0),
+        USBD_MAX_POWER(500)
     },
     .std_interface_com_desc =
     {
-        9,
-        USBD_REQUEST_DESC_INTERFACE,
+        USBD_LENGTH_INTERFACE_DESC,
+        USBD_DESC_TYPE_INTERFACE,
         0,
         0,
         1,
-        0x2U,
+        USBD_CLASS_CDC,
         0x2U,
         0x0U,
         0
@@ -195,21 +137,21 @@ static const struct __PACKED usbd_cdc_configuration_descriptor conf_desc =
     },
     .std_ep_com_desc =
     {
-        7,
-        USBD_REQUEST_DESC_ENDPOINT,
+        USBD_LENGTH_ENDPOINT_DESC,
+        USBD_DESC_TYPE_ENDPOINT,
         0x81U,
-        0x3U,
-        8,
+        USBD_ATTRIBUTES_TRANSFER_TYPE_INTERRUPT,
+        USBD_LS_MAX_PACKET_SIZE,
         0xFFU
     },
     .std_interface_data_desc =
     {
-        9,
-        USBD_REQUEST_DESC_INTERFACE,
-        0,
+        USBD_LENGTH_INTERFACE_DESC,
+        USBD_DESC_TYPE_INTERFACE,
+        1,
         0,
         2,
-        0xAU,
+        USBD_CLASS_CDC_DATA,
         0x0U,
         0x0U,
         0
@@ -217,20 +159,20 @@ static const struct __PACKED usbd_cdc_configuration_descriptor conf_desc =
     .std_ep_data_desc =
     {
         {
-            7,
-            USBD_REQUEST_DESC_ENDPOINT,
+            USBD_LENGTH_ENDPOINT_DESC,
+            USBD_DESC_TYPE_ENDPOINT,
             0x82U,
-            0x2U,
-            64,
-            0xFFU
+            USBD_ATTRIBUTES_TRANSFER_TYPE_BULK,
+            USBD_FS_MAX_PACKET_SIZE,
+            0x0U
         },
         {
-            7,
-            USBD_REQUEST_DESC_ENDPOINT,
+            USBD_LENGTH_ENDPOINT_DESC,
+            USBD_DESC_TYPE_ENDPOINT,
             0x2U,
-            0x2U,
-            64,
-            0xFFU
+            USBD_ATTRIBUTES_TRANSFER_TYPE_BULK,
+            USBD_FS_MAX_PACKET_SIZE,
+            0x0U
         }
     }
 };
@@ -254,7 +196,7 @@ static void usbd_ep2_out_handler(void);
 
 
 static bool is_selfpowered(void);
-/*Remote wakeup function are not needed.*/
+/*Remote wakeup functions are not needed.*/
 static bool is_interface_valid(uint8_t num);
 static bool is_endpoint_valid(uint8_t num, uint8_t dir);
 static void clear_stall(uint8_t num, uint8_t dir);
@@ -448,7 +390,9 @@ static void class_request(usbd_setup_packet_type setup)
         }
         default:
         {
-            USBD_DEV_ERR(Invalid bRequest.);
+            USBD_ERROR_LOG(Invalid bRequest.);
+            USBD_EP0_SET_STALL();
+            return;
             break;
         }
     }
@@ -475,7 +419,7 @@ static void usbd_ep2_out_handler(void)
     USBD_EP_CLEAR_CTR_RX(EP2);
     cdc_out_cnt = USBD_PMA_GET_RX_COUNT(EP2);
     usbd_pma_read(ADDR2_RX, cdc_out_buffer, cdc_out_cnt);
-    USBD_EP_SET_RX_VALID(EP2);
+    USBD_EP_SET_STAT_RX(EP2, USB_EP_STAT_RX_VALID);
 }
 
 usbd_core_config* cdc_init(void)

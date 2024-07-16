@@ -5,7 +5,6 @@
 
 #define PMA_BASE STM32L4xx_USB_SRAM_BASE
 #define PMA_SIZE (0x400U)
-#define USBD_FS_MAXPACKETSIZE (0x40U)
 #define EP0 0
 #define EP1 1
 #define EP2 2
@@ -163,18 +162,18 @@
 	? (GET(*USBD_EP_REG(ep), USB_EP_STAT_RX) == USB_EP_STAT_RX_STALL) \
 	: (GET(*USBD_EP_REG(ep), USB_EP_STAT_TX) == USB_EP_STAT_TX_STALL)
 
-
-#define USBD_EP_SET_TX_VALID(ep) do \
+#define USBD_EP_SET_STAT_TX(ep, flag) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
-	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, USB_EP_STAT_TX_VALID, USB_EP_STAT_TX); \
+	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, flag, USB_EP_STAT_TX); \
 }while(0)
 
-#define USBD_EP_SET_RX_VALID(ep) do \
+#define USBD_EP_SET_STAT_RX(ep, flag) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
-	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, USB_EP_STAT_RX_VALID, USB_EP_STAT_RX); \
+	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, flag, USB_EP_STAT_RX); \
 }while(0)
+
 
 #define USBD_EP_SET_KIND(ep) do \
 { \
@@ -216,13 +215,13 @@ __STATIC_INLINE void usbd_dev_error(const char* file, int line, const char* func
     UNUSED(line);
     UNUSED(func);
     UNUSED(val);
-	USBD_EP0_SET_STALL();
-
-    #ifndef NDEBUG
-       // __BKPT(0);
-    #endif /*NDEBUG*/
+	__BKPT(0);
 }
 
-#define USBD_DEV_ERR(param) usbd_dev_error(__FILE__, __LINE__, __func__, #param)
+#if defined(DEBUG) 
+	#define USBD_ERROR_LOG(param) usbd_dev_error(__FILE__, __LINE__, __func__, #param)
+#else
+	#define USBD_ERROR_LOG(param) (void)0
+#endif
 
 #endif /*USBD_HW_H*/
