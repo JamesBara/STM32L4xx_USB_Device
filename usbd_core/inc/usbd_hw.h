@@ -192,13 +192,13 @@
 #define USBD_EP_CLEAR_CTR_RX(ep) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
-	*USBD_EP_REG(0) = USBD_EP_CLEAR_RC_W0(ep_val, USB_EP_CTR_RX); \
+	*USBD_EP_REG(ep) = USBD_EP_CLEAR_RC_W0(ep_val, USB_EP_CTR_RX); \
 }while(0)
 
 #define USBD_EP_CLEAR_CTR_TX(ep) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
-	*USBD_EP_REG(0) = USBD_EP_CLEAR_RC_W0(ep_val, USB_EP_CTR_TX); \
+	*USBD_EP_REG(ep) = USBD_EP_CLEAR_RC_W0(ep_val, USB_EP_CTR_TX); \
 }while(0)
 
 #define USBD_EP_GET_SETUP(ep) (*USBD_EP_REG(ep) & USB_EP_SETUP)

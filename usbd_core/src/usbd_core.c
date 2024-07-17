@@ -4,7 +4,7 @@
 #include "usbd_request.h"
 #include "usbd_hw.h"
 
-#if 0
+
 enum usbd_event
 {
 	NONE = 0,
@@ -20,7 +20,7 @@ enum usbd_event
 	ERROR
 };
 #define USBD_MAX_EVENT 11
-#endif
+
 
 struct usbd_requests
 {
@@ -48,9 +48,8 @@ static struct usbd_requests const *prev_state;
 static uint16_t device_address;
 static usbd_core_config *config;
 static void (*ep_handler[8][2])(void);
-#if 0
-static void (*cur_ep_handler)(void);
 
+static void (*cur_ep_handler)(void);
 
 static struct usbd_queue
 {
@@ -63,7 +62,7 @@ static struct usbd_queue
 #define USBD_QUEUE_NEXT_TAIL() ((queue.tail + 1 == USBD_MAX_EVENT) ? 0 : (queue.tail + 1))
 #define USBD_QUEUE_IS_EMPTY() ((queue.head == queue.tail) ? 1 : 0)
 #define USBD_QUEUE_IS_FULL() ((USBD_QUEUE_NEXT_HEAD() == queue.tail) ? 1 : 0)
-#endif
+
 static void usbd_ep0_handler(void);
 static void usbd_setup_stage(void);
 static void usbd_data_out_stage(void);
@@ -87,15 +86,15 @@ static void usbd_synch_frame(usbd_setup_packet_type setup);
 static void usbd_class_request(usbd_setup_packet_type setup);
 static void usbd_vendor_request(usbd_setup_packet_type setup);
 
-#if 0
+
 static void usbd_event_enqueue(enum usbd_event e);
 static enum usbd_event usbd_event_dequeue(void);
-#endif
+
 static void usbd_event_generator(void);
 static void usbd_reset(void);
-#if 0
+
 static void usbd_device_event_handler(enum usbd_event e);
-#endif
+
 
 static const struct usbd_requests default_state =
 {
@@ -156,10 +155,6 @@ static void usbd_ep0_handler(void)
 	stage();
 }
 
-
-volatile usbd_setup_packet_type packet_dbg[25];
-volatile uint32_t packet_dbg_cnt = 0;
-
 static void usbd_setup_stage(void)
 {
 	usbd_setup_packet_type setup = {0};
@@ -172,14 +167,6 @@ static void usbd_setup_stage(void)
 	}
 
 	usbd_pma_read(ADDR0_RX, (uint8_t*)&setup, count);
-
-	packet_dbg[packet_dbg_cnt] = setup;
-
-	if (packet_dbg_cnt >= 13)
-	{
-		__BKPT(0);
-	}
-	packet_dbg_cnt++;
 	usbd_parse_setup_packet(setup);
 }
 
@@ -213,9 +200,7 @@ static void usbd_data_out_stage(void)
 {
 	/*Get the rx count and protect from underflow.*/
 	uint32_t cnt = MIN(USBD_PMA_GET_RX_COUNT(EP0), ep0_cnt);
-
-	usbd_pma_read(ADDR0_TX, ep0_buf, cnt);
-	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
+	usbd_pma_read(ADDR0_RX, ep0_buf, cnt);
 	/*Decrement the leftover bytes.*/
 	ep0_cnt -= cnt;
 
@@ -223,16 +208,17 @@ static void usbd_data_out_stage(void)
 	{
 		USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_NAK);
 	}
-
 	/*If there is leftover data, increment the buffer pointer.*/
 	if (ep0_cnt)
 	{
 		ep0_buf += cnt;
+		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
 	}
 	/*Otherwise the stage is completed.*/
 	else
 	{
 		stage = usbd_status_in_stage;
+		USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 	}
 }
 
@@ -726,7 +712,7 @@ static void usbd_vendor_request(usbd_setup_packet_type setup)
 	ASSERT(config->vendor_request != NULL);
 	config->vendor_request(setup);
 }
-#if 0
+
 static void usbd_event_enqueue(enum usbd_event e)
 {
 	ASSERT(!USBD_QUEUE_IS_FULL());
@@ -744,10 +730,10 @@ static enum usbd_event usbd_event_dequeue(void)
 	}
 	return e;
 }
-#endif
+
 static void usbd_event_generator(void)
 {
-	//enum usbd_event e = NONE;
+	enum usbd_event e = NONE;
 	uint32_t istr = USB->ISTR;
 
 	if (GET(istr, USB_ISTR_CTR))
@@ -763,42 +749,45 @@ static void usbd_event_generator(void)
 		{
 			USBD_EP_CLEAR_CTR_RX(ep);
 		}
-		//cur_ep_handler = ep_handler[ep][dir];
-		//e = CTR;
+
+		cur_ep_handler = ep_handler[ep][dir];
+
+		e = CTR;
 		if (USBD_EP_GET_SETUP(ep))
 		{
 			stage = usbd_setup_stage;
 		}
-		ep_handler[ep][dir]();
+		//ep_handler[ep][dir]();
 
 	}
-
-	if (GET(istr, USB_ISTR_RESET))
+	else if (GET(istr, USB_ISTR_RESET))
 	{
 		CLEAR(istr, USB_ISTR_RESET);
-		usbd_reset();
-		//e = RESET;
+		//usbd_reset();
+		e = RESET;
 	}
-
-
-#if 0
 	else if (GET(istr, USB_ISTR_WKUP))
 	{
-		CLEAR(istr, USB_ISTR_WKUP);		
+		CLEAR(istr, USB_ISTR_WKUP);
 		/*Restore the cur_state state.*/
-		cur_state = prev_state;
-		prev_state = NULL;
-		ASSERT(config->wakeup != NULL);
-		config->wakeup();
+		//cur_state = prev_state;
+		//prev_state = NULL;
+		//ASSERT(config->wakeup != NULL);
+		//config->wakeup();
+		e = WAKEUP;
 	}
 	else if (GET(istr, USB_ISTR_SUSP))
 	{
 		CLEAR(istr, USB_ISTR_SUSP);
-		prev_state = cur_state;
-		cur_state = &suspended_state;
-		ASSERT(config->suspend != NULL);
-		config->suspend();
+		//prev_state = cur_state;
+		//cur_state = &suspended_state;
+		//ASSERT(config->suspend != NULL);
+		//config->suspend();
+		e = SUSPEND;
 	}
+#if 0
+
+
 	else if (GET(istr, USB_ISTR_ESOF))
 	{
 		CLEAR(istr, USB_ISTR_ESOF);
@@ -816,7 +805,7 @@ static void usbd_event_generator(void)
 		CLEAR(istr, USB_ISTR_ERR);		
 	}
 #endif
-	//usbd_event_enqueue(e);
+	usbd_event_enqueue(e);
 	USB->ISTR = istr;
 }
 
@@ -833,7 +822,7 @@ static void usbd_reset(void)
 	USB->DADDR = USB_DADDR_EF;
 }
 
-#if 0
+
 static void usbd_device_event_handler(enum usbd_event e)
 {
 	switch (e)
@@ -881,12 +870,13 @@ static void usbd_device_event_handler(enum usbd_event e)
 		}
 		default:
 		{
-			USBD_DEV_ERR(Unknown Event.);
+			USBD_ERROR_LOG(Unknown Event.);
+			USBD_EP0_SET_STALL();
 			break;
 		}		
 	}
 }
-#endif
+
 /**
  * @brief Initialize a single buffer bidirectional endpoint.
  * @param ep Endpoint number.
@@ -1107,7 +1097,7 @@ void usbd_core_init(usbd_core_config *conf)
 	/*Remove force reset.*/
 	CLEAR(USB->CNTR, USB_CNTR_FRES);
 	/*Enable interrupts.*/
-	SET(USB->CNTR, (USB_CNTR_CTRM | USB_CNTR_RESETM));//| USB_CNTR_SUSPM | USB_CNTR_WAKEUPM
+	SET(USB->CNTR, (USB_CNTR_CTRM | USB_CNTR_RESETM | USB_CNTR_SUSPM | USB_CNTR_WAKEUPM));
 	/*Clear pending interrupts*/
 	USB->ISTR = 0x0U;
 
@@ -1115,7 +1105,7 @@ void usbd_core_init(usbd_core_config *conf)
 	SET(USB->BCDR, USB_BCDR_DPPU);
 }
 
-#if 0
+
 void usbd_core_run(void)
 {
 	uint32_t primask = __get_PRIMASK();
@@ -1127,7 +1117,7 @@ void usbd_core_run(void)
 	__set_PRIMASK(primask);
 	usbd_device_event_handler(e);
 }
-#endif
+
 
 void USB_IRQHandler(void)
 {

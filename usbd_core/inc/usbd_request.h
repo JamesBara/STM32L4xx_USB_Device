@@ -1,11 +1,12 @@
 #ifndef USBD_REQUEST_H
 #define USBD_REQUEST_H
 
+#include <stdint.h>
 #include "stm32l4xx.h"
 
 /*******************************************************************************
-- Setup Packet definitions
-******************************************************************************/
+ * Setup Packet definitions
+ ******************************************************************************/
 
 #define USBD_SETUP_PACKET_SIZE (0x8U)
 
@@ -143,12 +144,12 @@
 #define USBD_ATTRIBUTES_USAGE_TYPE_RESERVED (0x3U << USBD_ATTRIBUTES_USAGE_TYPE_Pos)
 
 /************************************************
- *	bMaxPower
+ * bMaxPower
  ***********************************************/
 #define USBD_MAX_POWER(x) ((x) >> 0x1U)
 
 /************************************************
- *  Endpoint bEndpointAddress
+ *  bEndpointAddress
  ***********************************************/
 #define USBD_EP_ADDRESS_EP_NUMBER_Pos 0
 #define USBD_EP_ADDRESS_EP_NUMBER_Msk (0xFU << USBD_EP_ADDRESS_EP_NUMBER_Pos)
@@ -159,7 +160,7 @@
 #define USBD_EP_ADDRESS_EP_DIRECTION USBD_EP_ADDRESS_EP_DIRECTION_Msk
 
 /************************************************
- *  Endpoint wMaxPacketSize
+ *  wMaxPacketSize
  ***********************************************/
 #define USBD_LS_MAX_PACKET_SIZE 0x8U /*!< USB Low Speed Max packet size. */
 #define USBD_FS_MAX_PACKET_SIZE 0x40U /*!< USB Full Speed Max packet size. */
@@ -175,8 +176,8 @@
 #define USBD_DEV_CAPABILITY_TYPE_PLATFORM_CAPABILITY 0x5U
 
 /*******************************************************************************
-- USBD Descriptors structs
-******************************************************************************/
+ * USBD Descriptors structs
+ ******************************************************************************/
 
 /************************************************
  *  Standard Device Descriptor
@@ -253,8 +254,8 @@ typedef struct
 }__PACKED usbd_std_string_descriptor_type;
 
 /************************************************
-*  Standard BOS Descriptor
-***********************************************/
+ *  Standard BOS Descriptor
+ ***********************************************/
 typedef struct
 {
     uint8_t bLength;
@@ -264,8 +265,8 @@ typedef struct
 }__PACKED usbd_std_bos_descriptor_type;
 
 /************************************************
-* Standard Platform Capability Descriptor
-***********************************************/
+ * Standard Platform Capability Descriptor
+ ***********************************************/
 typedef struct
 {
     uint8_t bLength;
@@ -277,8 +278,8 @@ typedef struct
 }__PACKED usbd_std_platform_capability_descriptor_type;
 
 /************************************************
-* Microsoft OS 2.0 Descriptor Set Information 
-***********************************************/
+ * Microsoft OS 2.0 Descriptor Set Information 
+ ***********************************************/
 /*CapabilityData of the MS OS 2.0 descriptor.*/
 typedef struct
 {
@@ -289,8 +290,8 @@ typedef struct
 }__PACKED usbd_ms_os20_set_information_descriptor_type;
 
 /************************************************
-*  Setup packet
-***********************************************/
+ *  Setup packet
+ ***********************************************/
 typedef struct
 {
 	uint8_t bmRequestType;

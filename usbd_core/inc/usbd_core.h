@@ -58,6 +58,6 @@ void usbd_prepare_data_out_stage(uint8_t* buf, uint32_t cnt, void (*rx_cplt)(voi
 void usbd_prepare_status_in_stage(void);
 
 void usbd_core_init(usbd_core_config *conf);
-//void usbd_core_run(void);
+void usbd_core_run(void);
 
 #endif /*USBD_CORE_H*/
