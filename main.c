@@ -11,6 +11,6 @@ int main()
 
 	while (1)
 	{
-		usbd_core_run();
+
 	}
 }

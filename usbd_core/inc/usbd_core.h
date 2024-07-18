@@ -42,6 +42,7 @@ typedef struct
 	void (*vendor_request)(usbd_setup_packet_type setup);
 	void (*suspend)(void);
 	void (*wakeup)(void);
+	void (*sof)(void);
 }usbd_core_config;
 
 void usbd_register_ep(uint8_t ep, uint32_t type, uint16_t tx_addr, uint16_t rx_addr, uint16_t rx_count, void (*ep_in)(void), void (*ep_out)(void));
@@ -58,6 +59,8 @@ void usbd_prepare_data_out_stage(uint8_t* buf, uint32_t cnt, void (*rx_cplt)(voi
 void usbd_prepare_status_in_stage(void);
 
 void usbd_core_init(usbd_core_config *conf);
+#if USBD_CORE_EVENT_DRIVEN == 1
 void usbd_core_run(void);
+#endif
 
 #endif /*USBD_CORE_H*/

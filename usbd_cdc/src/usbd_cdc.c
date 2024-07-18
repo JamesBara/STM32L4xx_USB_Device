@@ -164,9 +164,6 @@ static uint8_t get_configuration(void);
 static bool is_configuration_valid(uint8_t num);
 static void set_configuration(uint8_t num);
 static void class_request(usbd_setup_packet_type setup);
-void suspend(void);
-void wakeup(void);
-
 
 static usbd_core_config usbd_cdc_conf =
 {
@@ -188,8 +185,9 @@ static usbd_core_config usbd_cdc_conf =
     NULL,
     class_request,
     NULL,
-    suspend,
-    wakeup
+    NULL,
+    NULL,
+    NULL
 };
 
 static bool is_selfpowered(void)
@@ -340,29 +338,17 @@ static void class_request(usbd_setup_packet_type setup)
         case USBD_CDC_SET_CONTROL_LINE_STATE:
         {
             dtr = (setup.wValue & 0x1U);
-            rts = (!(setup.wValue & 0x2U)) ? 0x0U : 0x1U;
+            rts = (setup.wValue & 0x2U) ? 0x1U : 0x0U;
             usbd_prepare_status_in_stage();
             break;
         }
         default:
         {
-            USBD_ERROR_LOG(Invalid bRequest.);
             USBD_EP0_SET_STALL();
             return;
             break;
         }
     }
-}
-
-void suspend(void)
-{
-    __WFI();
-}
-
-void wakeup(void)
-{
-    set_cpu_max_freq();
-    set_usbd_clk_src_hsi48();
 }
 
 static void usbd_ep1_in_handler(void)
@@ -421,10 +407,6 @@ bool usbd_cdc_get_dtr(void)
 
 void usbd_cdc_transmit(uint8_t* buf, uint32_t cnt)
 {
-    if (!dtr)
-    {
-        return;
-    }
     cdc_in_buffer = buf;
     cdc_in_cnt = cnt;
     USBD_PMA_SET_TX_COUNT(EP2, MIN(cdc_in_cnt, USBD_FS_MAX_PACKET_SIZE));

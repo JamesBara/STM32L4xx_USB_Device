@@ -178,13 +178,13 @@
 #define USBD_EP_SET_KIND(ep) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
-	*USBD_EP_REG(0) = USBD_EP_SET_RW(ep_val, USB_EP_KIND); \
+	*USBD_EP_REG(ep) = USBD_EP_SET_RW(ep_val, USB_EP_KIND); \
 }while(0)
 
 #define USBD_EP_CLEAR_KIND(ep) do \
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
-	*USBD_EP_REG(0) = USBD_EP_CLEAR_RW(ep_val, USB_EP_KIND); \
+	*USBD_EP_REG(ep) = USBD_EP_CLEAR_RW(ep_val, USB_EP_KIND); \
 }while(0)
 
 #define USBD_EP_GET_KIND(ep) GET(*USBD_EP_REG(ep), USB_EP_KIND)
@@ -205,23 +205,8 @@
 
 #define USBD_EP0_SET_STALL() do \
 { \
-	uint16_t ep_val = *USBD_EP_REG(0); \
-	*USBD_EP_REG(0) = USBD_EP_SET_TOGGLE(ep_val, (USB_EP_STAT_RX_STALL | USB_EP_STAT_TX_STALL), (USB_EP_STAT_RX | USB_EP_STAT_TX)); \
+	uint16_t ep_val = *USBD_EP_REG(EP0); \
+	*USBD_EP_REG(EP0) = USBD_EP_SET_TOGGLE(ep_val, (USB_EP_STAT_RX_STALL | USB_EP_STAT_TX_STALL), (USB_EP_STAT_RX | USB_EP_STAT_TX)); \
 }while(0)
-
-__STATIC_INLINE void usbd_dev_error(const char* file, int line, const char* func, const char* val)
-{
-    UNUSED(file);
-    UNUSED(line);
-    UNUSED(func);
-    UNUSED(val);
-	__BKPT(0);
-}
-
-#if defined(DEBUG) 
-	#define USBD_ERROR_LOG(param) usbd_dev_error(__FILE__, __LINE__, __func__, #param)
-#else
-	#define USBD_ERROR_LOG(param) (void)0
-#endif
 
 #endif /*USBD_HW_H*/
