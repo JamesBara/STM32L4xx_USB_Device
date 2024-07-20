@@ -29,25 +29,22 @@ set(TARGET_LINKER_SCRIPT "STM32L412.ld")
 set(TARGET_FLAGS "-mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${TARGET_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic -fdata-sections -ffunction-sections -fno-delete-null-pointer-checks") # -ffreestanding
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic -fdata-sections -ffunction-sections")
 
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
-    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -ggdb3")
-   # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -ggdb3 -DNDEBUG")
-   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -ggdb3")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -ggdb3")
 elseif(CMAKE_BUILD_TYPE MATCHES Release)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -ggdb0 -DNDEBUG")
 elseif(CMAKE_BUILD_TYPE MATCHES RelWithDebInfo)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 --ggdb -DNDEBUG")
 elseif(CMAKE_BUILD_TYPE MATCHES MinSizeRel)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os -ggdb0 -DNDEBUG")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os -ggdb0 -DNDEBUG")
 endif()
 
-# Adds some preprocessor options that I am unsure if they are needed.
 set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp -MMD -MP")
 
 set(CMAKE_C_LINK_FLAGS "${TARGET_FLAGS}")
 set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} -T \"${CMAKE_SOURCE_DIR}/${TARGET_LINKER_SCRIPT}\"")
 
-set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} -Wl,-Map=${CMAKE_PROJECT_NAME}.map,--cref -Wl,--gc-sections -lgcc -Wl,--print-memory-usage") # -nostdlib.
+set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} -Wl,-Map=${CMAKE_PROJECT_NAME}.map,--cref -Wl,--gc-sections -lgcc -Wl,--print-memory-usage")

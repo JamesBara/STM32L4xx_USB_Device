@@ -41,13 +41,13 @@ struct usbd_requests
 
 static uint8_t *ep0_buf;
 static uint32_t ep0_cnt;
-static void (*stage)(void);
-static void (*reception_completed)(void);
+static void (* stage)(void);
+static void (* reception_completed)(void);
 static struct usbd_requests const *cur_state;
 static struct usbd_requests const *prev_state;
 static uint16_t device_address;
-static usbd_core_config *config;
-static void (*ep_handler[8][2])(void);
+static usbd_core_config_type *config;
+static void (* ep_handler[8][2])(void);
 #if USBD_CORE_EVENT_DRIVEN == 1
 static void (*cur_ep_handler)(void);
 
@@ -184,13 +184,11 @@ static void usbd_data_in_stage(void)
 		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
 		return;
 	}
-
 	/*If it's a short packet the opposite direction is set to NAK.*/
 	if (ep0_cnt < EP0_COUNT)
 	{
 		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_NAK);
 	}
-
 	/*Increment the buffer.*/
 	ep0_buf += cnt;
 	/*Copy a packet to usb sram*/
@@ -249,9 +247,7 @@ static void usbd_status_in_stage(void)
 	ep0_buf = NULL;
 	ep0_cnt = 0;
 	stage = NULL;
-
 	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
-	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_NAK);
 }
 
 static void usbd_status_out_stage(void)
@@ -263,7 +259,6 @@ static void usbd_status_out_stage(void)
 	ep0_cnt = 0;
 	stage = NULL;
 	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
-	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_NAK);
 }
 
 static void usbd_parse_setup_packet(usbd_setup_packet_type setup)
@@ -670,6 +665,7 @@ static void usbd_set_interface(usbd_setup_packet_type setup)
 static void usbd_synch_frame(usbd_setup_packet_type setup)
 {
 	UNUSED(setup);
+	/*@todo*/
 	//uint8_t ep = (setup.wIndex & 0xFF);
 	//uint8_t buf[2];
 	/*@todo check if endpoint iso*/
@@ -878,13 +874,14 @@ static void usbd_irq_handler(void)
 		ASSERT(ep_handler[ep][dir] != NULL);
 		ep_handler[ep][dir]();
 	}
-	else if (GET(istr, USB_ISTR_RESET))
+
+	if (GET(istr, USB_ISTR_RESET))
 	{
 		CLEAR(istr, USB_ISTR_RESET);
 		usbd_reset();
 	}
-#if 0
-	else if (GET(istr, USB_ISTR_WKUP))
+
+	if (GET(istr, USB_ISTR_WKUP))
 	{
 		CLEAR(istr, USB_ISTR_WKUP);
 		/*Line noise detection*/
@@ -900,9 +897,9 @@ static void usbd_irq_handler(void)
 		{
 			config->wakeup();
 		}
-
 	}
-	else if (GET(istr, USB_ISTR_SUSP))
+
+	if (GET(istr, USB_ISTR_SUSP))
 	{
 		CLEAR(istr, USB_ISTR_SUSP);
 		prev_state = cur_state;
@@ -915,7 +912,8 @@ static void usbd_irq_handler(void)
 		}	
 
 	}	
-	else if (GET(istr, USB_ISTR_SOF))
+
+	if (GET(istr, USB_ISTR_SOF))
 	{
 		CLEAR(istr, USB_ISTR_SOF);
 		if (config->sof != NULL)
@@ -923,7 +921,7 @@ static void usbd_irq_handler(void)
 			config->sof();
 		}
 	}
-#endif
+
 	USB->ISTR = istr;
 }
 #endif
@@ -1008,7 +1006,7 @@ void usbd_unregister_ep(uint8_t ep)
  * @param dst Pointer to volatile uint16_t usb sram memory buffer, the pma address of an enpoint should be used.
  * @param cnt Amount of data to copy from buffer to usb sram buffer.
 */
-void usbd_pma_write(uint8_t* src, __IO uint16_t* dst, uint16_t cnt)
+void usbd_pma_write(uint8_t* src, uint16_t* dst, uint16_t cnt)
 {
 	uint16_t half_cnt, tmp_val;
 	half_cnt = (cnt >> 0x1U);
@@ -1038,7 +1036,7 @@ void usbd_pma_write(uint8_t* src, __IO uint16_t* dst, uint16_t cnt)
  * @param dst Pointer to uint8_t buffer, this is the buffer to copy the data to.
  * @param cnt Amount of data to copy from usb sram buffer to buffer. There is no error checking in this function.
 */
-void usbd_pma_read(__IO uint16_t* src, uint8_t* dst, uint16_t cnt)
+void usbd_pma_read(uint16_t* src, uint8_t* dst, uint16_t cnt)
 {
 	uint16_t half_cnt, tmp_val;
 	half_cnt = (cnt >> 0x1U);
@@ -1073,16 +1071,22 @@ void usbd_prepare_data_in_stage(uint8_t* buf, uint32_t cnt)
 	ep0_buf = buf;
 	ep0_cnt = cnt;
 	stage = usbd_data_in_stage;
+
+	//uint16_t ep_val = *USBD_EP_REG(EP0);
+	//uint16_t rx_flag;
 	if (ep0_cnt >= EP0_COUNT)
 	{
+		//rx_flag = USB_EP_STAT_RX_STALL;
 		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_STALL);
 	}
 	else
 	{
+		//rx_flag = USB_EP_STAT_RX_NAK;
 		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_NAK);
 	}
 	USBD_PMA_SET_TX_COUNT(EP0, MIN(EP0_COUNT, ep0_cnt));
 	usbd_pma_write(ep0_buf, ADDR0_TX, MIN(EP0_COUNT, ep0_cnt));
+	//*USBD_EP_REG(EP0) = USBD_EP_SET_TOGGLE(ep_val, (rx_flag | USB_EP_STAT_TX_VALID), (USB_EP_STAT_RX | USB_EP_STAT_TX));
 	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
@@ -1128,7 +1132,7 @@ void usbd_prepare_status_in_stage(void)
 	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
-void usbd_core_init(usbd_core_config *conf)
+void usbd_core_init(usbd_core_config_type *conf)
 {
 	ASSERT(conf != NULL);
 	config = conf;
@@ -1151,7 +1155,7 @@ void usbd_core_init(usbd_core_config *conf)
 	/*Remove force reset.*/
 	CLEAR(USB->CNTR, USB_CNTR_FRES);
 	/*Enable interrupts.*/
-	SET(USB->CNTR, (USB_CNTR_CTRM | USB_CNTR_RESETM));// | USB_CNTR_SUSPM | USB_CNTR_WAKEUPM | USB_CNTR_SOFM
+	SET(USB->CNTR, (USB_CNTR_CTRM | USB_CNTR_RESETM | USB_CNTR_SUSPM | USB_CNTR_WAKEUPM | USB_CNTR_SOFM));
 	/*Clear pending interrupts*/
 	USB->ISTR = 0x0U;
 
