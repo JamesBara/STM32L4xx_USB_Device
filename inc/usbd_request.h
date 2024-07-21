@@ -273,18 +273,6 @@ typedef struct
 }__PACKED usbd_std_platform_capability_descriptor_type;
 
 /************************************************
- * Microsoft OS 2.0 Descriptor Set Information 
- ***********************************************/
-/*CapabilityData of the MS OS 2.0 descriptor.*/
-typedef struct
-{
-    uint32_t dwWindowsVersion;
-    uint16_t wMSOSDescriptorSetTotalLength;
-    uint8_t bMS_VendorCode;
-    uint8_t bAltEnumCode;
-}__PACKED usbd_ms_os20_set_information_descriptor_type;
-
-/************************************************
  *  Setup packet
  ***********************************************/
 typedef struct
