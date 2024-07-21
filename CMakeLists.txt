@@ -1,77 +1,17 @@
-﻿cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required (VERSION 3.29.0)
+project(STM32L4xx_USB_Device)
+add_library(STM32L4xx_USB_Device INTERFACE)
 
-# Setup compiler settings
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS ON)
-
-
-# Define the build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Debug")
-endif()
-
-# Set the project name
-set(CMAKE_PROJECT_NAME STM32L4xx_USB_Device)
-
-# Include toolchain file
-include("gcc-arm-none-eabi.cmake")
-
-# Enable compile command to ease indexing with e.g. clangd
-set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-
-# Enable CMake support for C languages
 enable_language(C)
 
-# Core project settings
-project(${CMAKE_PROJECT_NAME})
-
-message("Build type: " ${CMAKE_BUILD_TYPE})
-
-# Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
-
-
-add_subdirectory(STM32L4xx)
-add_subdirectory(usbd_core)
-add_subdirectory(bsp)
-
-# Link directories setup
-target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined library search paths
-)
-
-# Add sources to executable
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
-    "main.c"
-)
-
-# Add include paths
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+target_include_directories(STM32L4xx_USB_Device INTERFACE
     inc
 )
 
-# Add project symbols (macros)
-target_compile_definitions(STM32L4xx INTERFACE
-     $<$<CONFIG:Debug>:DEBUG>
-     STM32L412
+target_sources(STM32L4xx_USB_Device INTERFACE
+    src/usbd_core.c
 )
 
-target_compile_definitions(usbd_core INTERFACE
-    $<$<CONFIG:Debug>:DEBUG>
-)
-
-
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-     $<$<CONFIG:Debug>:DEBUG>
-)
-
-
-# Add linked libraries
-target_link_libraries(${CMAKE_PROJECT_NAME}
+target_link_libraries(STM32L4xx_USB_Device INTERFACE
     STM32L4xx
-    bsp
-    usbd_core
-    # Add user defined libraries
 )

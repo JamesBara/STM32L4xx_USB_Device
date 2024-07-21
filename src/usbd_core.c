@@ -1285,7 +1285,7 @@ void usbd_core_init(usbd_core_config_type *conf)
 	CLEAR(USB->CNTR, USB_CNTR_PDWN);
 
 	/*1 microsecond delay is needed for stm32l412 according to the datasheet.*/
-	__cpu_busy_wait(1);
+	__spinlock(1);
 
 	USB->BTABLE = 0;
 
