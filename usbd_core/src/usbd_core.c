@@ -22,6 +22,10 @@ enum usbd_event
 #define USBD_MAX_EVENT 11
 #endif
 
+/************************************************
+ * USB requests callbacks.
+ * These callbacks vary per state.
+ ***********************************************/
 struct usbd_requests
 {
 	void (*get_status)(usbd_setup_packet_type setup);
@@ -39,15 +43,19 @@ struct usbd_requests
 	void (*vendor_request)(usbd_setup_packet_type setup);
 };
 
-static uint8_t *ep0_buf;
-static uint32_t ep0_cnt;
-static void (* stage)(void);
-static void (* reception_completed)(void);
-static struct usbd_requests const *cur_state;
-static struct usbd_requests const *prev_state;
-static uint16_t device_address;
-static usbd_core_config_type *config;
-static void (* ep_handler[8][2])(void);
+/************************************************
+ * Static variables and callbacks 
+ * used by the usb core.
+ ***********************************************/
+static uint8_t *ep0_buf; /*!< Pointer to endpoint 0 buffer.*/
+static uint32_t ep0_cnt; /*!< endpoint 0 buffer data count.*/
+static void (*stage)(void); /*!< Pointer to current stage callback.*/
+static void (*reception_completed)(void); /*!< Stores a callback function, used to let the user know that a data reception in endpoint 0 has been completed. (Useful for class and/or vendor requests)*/
+static struct usbd_requests const *cur_state; /*!< Pointer to current state of the device.*/
+static struct usbd_requests const *prev_state; /*!< Pointer to previous state of the device.(Used to store the state when the device gets suspended)*/
+static uint16_t device_address; /*!< Stores the device address.*/
+static usbd_core_config_type *config; /*!< Pointer to the configuration provided by the user during initialization.*/
+static void (*ep_handler[8][2])(void); /*!< Pointer to stored endpoint callback functions.*/
 #if USBD_CORE_EVENT_DRIVEN == 1
 static void (*cur_ep_handler)(void);
 
@@ -63,6 +71,10 @@ static struct usbd_queue
 #define USBD_QUEUE_IS_EMPTY() ((queue.head == queue.tail) ? 1 : 0)
 #define USBD_QUEUE_IS_FULL() ((USBD_QUEUE_NEXT_HEAD() == queue.tail) ? 1 : 0)
 #endif
+
+/************************************************
+ * Function prototypes.
+ ***********************************************/
 static void usbd_ep0_handler(void);
 static void usbd_setup_stage(void);
 static void usbd_data_out_stage(void);
@@ -97,6 +109,9 @@ static void usbd_device_event_handler(enum usbd_event e);
 static void usbd_irq_handler(void);
 #endif
 
+/************************************************
+ * Request callbacks for default state.
+ ***********************************************/
 static const struct usbd_requests default_state =
 {
 	NULL,
@@ -114,6 +129,9 @@ static const struct usbd_requests default_state =
 	NULL
 };
 
+/************************************************
+ * Request callbacks for address state.
+ ***********************************************/
 static const struct usbd_requests addressed_state =
 {
 	usbd_get_status,
@@ -131,6 +149,9 @@ static const struct usbd_requests addressed_state =
 	usbd_vendor_request
 };
 
+/************************************************
+ * Request callbacks for configured state.
+ ***********************************************/
 static const struct usbd_requests configured_state =
 {
 	usbd_get_status,
@@ -148,14 +169,25 @@ static const struct usbd_requests configured_state =
 	usbd_vendor_request
 };
 
+/************************************************
+ * Request callbacks for suspended state.
+ ***********************************************/
 static const struct usbd_requests suspended_state;
 
+/**
+ * @brief Endpoint 0 callback function.
+ * @param  
+ */
 static void usbd_ep0_handler(void)
 {
 	ASSERT(stage != NULL);
 	stage();
 }
 
+/**
+ * @brief Setup stage callback function.
+ * @param  
+ */
 static void usbd_setup_stage(void)
 {
 	usbd_setup_packet_type setup = {0};
@@ -170,6 +202,10 @@ static void usbd_setup_stage(void)
 	usbd_parse_setup_packet(setup);
 }
 
+/**
+ * @brief Data stage callback function, for IN direction.
+ * @param  
+ */
 static void usbd_data_in_stage(void)
 {
 	uint32_t cnt = MIN(EP0_COUNT, ep0_cnt);
@@ -197,6 +233,10 @@ static void usbd_data_in_stage(void)
 	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
+/**
+ * @brief Data stage callback function for OUT direction.
+ * @param  
+ */
 static void usbd_data_out_stage(void)
 {
 	/*Get the rx count and protect from underflow.*/
@@ -223,6 +263,10 @@ static void usbd_data_out_stage(void)
 	}
 }
 
+/**
+ * @brief Status stage callback function for IN direction.
+ * @param  
+ */
 static void usbd_status_in_stage(void)
 {
 	if (device_address && cur_state == &default_state)
@@ -250,6 +294,10 @@ static void usbd_status_in_stage(void)
 	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
 }
 
+/**
+ * @brief Status stage callback function for OUT direction.
+ * @param  
+ */
 static void usbd_status_out_stage(void)
 {
 	/*Clear hardware status out*/
@@ -261,6 +309,12 @@ static void usbd_status_out_stage(void)
 	USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_VALID);
 }
 
+/**
+ * @brief Parses the received setup packet and calls 
+ * the appropriate callback function depending on 
+ * the current device state.
+ * @param setup USB setup packet.
+ */
 static void usbd_parse_setup_packet(usbd_setup_packet_type setup)
 {
     switch(setup.bmRequestType & USBD_TYPE)
@@ -414,6 +468,10 @@ static void usbd_parse_setup_packet(usbd_setup_packet_type setup)
     }
 }
 
+/**
+ * @brief USB get status callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_get_status(usbd_setup_packet_type setup)
 {
 	uint8_t buf[2] = { 0x0U, 0x0U };
@@ -465,6 +523,10 @@ static void usbd_get_status(usbd_setup_packet_type setup)
 	usbd_prepare_data_in_stage(buf, USBD_GET_STATUS_LENGTH);
 }
 
+/**
+ * @brief USB clear feature callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_clear_feature(usbd_setup_packet_type setup)
 {
 	switch (setup.bmRequestType & USBD_RECIPIENT)
@@ -501,6 +563,10 @@ static void usbd_clear_feature(usbd_setup_packet_type setup)
 	usbd_prepare_status_in_stage();
 }
 
+/**
+ * @brief USB set feature callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_set_feature(usbd_setup_packet_type setup)
 {
 	switch (setup.bmRequestType & USBD_RECIPIENT)
@@ -543,12 +609,20 @@ static void usbd_set_feature(usbd_setup_packet_type setup)
 	usbd_prepare_status_in_stage();
 }
 
+/**
+ * @brief USB set address callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_set_address(usbd_setup_packet_type setup)
 {
 	device_address = setup.wValue;
 	usbd_prepare_status_in_stage();
 }
 
+/**
+ * @brief USB get descriptor callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_get_descriptor(usbd_setup_packet_type setup)
 {
 	uint8_t *buf = NULL;
@@ -598,6 +672,10 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
 	usbd_prepare_data_in_stage(buf, cnt);
 }
 
+/**
+ * @brief USB set descriptor callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_set_descriptor(usbd_setup_packet_type setup)
 {
 	ASSERT(config != NULL);
@@ -605,6 +683,10 @@ static void usbd_set_descriptor(usbd_setup_packet_type setup)
 	config->set_descriptor(setup);
 }
 
+/**
+ * @brief USB get descriptor callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_get_configuration(usbd_setup_packet_type setup)
 {
 	UNUSED(setup);
@@ -615,6 +697,10 @@ static void usbd_get_configuration(usbd_setup_packet_type setup)
 	usbd_prepare_data_in_stage(&buf, USBD_GET_CONFIGURATION_LENGTH);
 }
 
+/**
+ * @brief USB set configuration callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_set_configuration(usbd_setup_packet_type setup)
 {
 	uint8_t num = (setup.wValue & 0xFFU);
@@ -631,6 +717,10 @@ static void usbd_set_configuration(usbd_setup_packet_type setup)
 	usbd_prepare_status_in_stage();
 }
 
+/**
+ * @brief USB get interface callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_get_interface(usbd_setup_packet_type setup)
 {
 	uint8_t num = (setup.wIndex & 0x7FU);
@@ -647,6 +737,10 @@ static void usbd_get_interface(usbd_setup_packet_type setup)
 	usbd_prepare_data_in_stage(&buf, USBD_GET_INTERFACE_LENGTH);
 }
 
+/**
+ * @brief USB set interface callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_set_interface(usbd_setup_packet_type setup)
 {
 	uint8_t num = (setup.wIndex & 0x7FU);
@@ -662,6 +756,10 @@ static void usbd_set_interface(usbd_setup_packet_type setup)
 	usbd_prepare_status_in_stage();	
 }
 
+/**
+ * @brief USB synch frame callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_synch_frame(usbd_setup_packet_type setup)
 {
 	UNUSED(setup);
@@ -673,6 +771,10 @@ static void usbd_synch_frame(usbd_setup_packet_type setup)
 	//usbd_prepare_data_in_stage(buf, USBD_SYNCH_FRAME_LENGTH);
 }
 
+/**
+ * @brief USB class specific request callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_class_request(usbd_setup_packet_type setup)
 {
 	ASSERT(config != NULL);
@@ -680,6 +782,10 @@ static void usbd_class_request(usbd_setup_packet_type setup)
 	config->class_request(setup);
 }
 
+/**
+ * @brief USB vendor specific request callback function.
+ * @param setup USB setup packet.
+ */
 static void usbd_vendor_request(usbd_setup_packet_type setup)
 {
 	ASSERT(config != NULL);
@@ -687,6 +793,10 @@ static void usbd_vendor_request(usbd_setup_packet_type setup)
 	config->vendor_request(setup);
 }
 
+/**
+ * @brief Resets the usb device.
+ * @param  
+ */
 static void usbd_reset(void)
 {
 	for (uint8_t i = 0; i < 8; i++)
@@ -849,7 +959,11 @@ static void usbd_device_event_handler(enum usbd_event e)
 }
 #else
 
-
+/**
+ * @brief Handle the usb interrupts.
+ * @note This function should be called by USB_IRQHandler interrupt callback.
+ * @param  
+ */
 static void usbd_irq_handler(void)
 {
 	uint32_t istr = USB->ISTR;
@@ -926,18 +1040,15 @@ static void usbd_irq_handler(void)
 }
 #endif
 
-
-
-
 /**
  * @brief Initialize a single buffer bidirectional endpoint.
  * @param ep Endpoint number.
  * @param type Endpoint type.
- * @param tx_addr The address offset of the endpooint's IN buffer inside the Packet Memory Area.
+ * @param tx_addr The address offset of the endpoint's IN buffer inside the Packet Memory Area.
  * @param rx_addr The address offset of the endpoint's OUT buffer inside the Packet Memory Area.
  * @param rx_count The size of the endpoint's OUT buffer inside the Packet Memory Area.
- * @param ep_in Pointer to function that handles the IN transaction of the endpoint.
- * @param ep_out Pointer to function that handles the OUT transaction of the endpoint.
+ * @param ep_in Pointer to callback function that handles the IN transaction of the endpoint.
+ * @param ep_out Pointer to callback function that handles the OUT transaction of the endpoint.
 */
 void usbd_register_ep(uint8_t ep, uint32_t type, uint16_t tx_addr, uint16_t rx_addr, uint16_t rx_count, void (*ep_in)(void), void (*ep_out)(void))
 {
@@ -951,6 +1062,13 @@ void usbd_register_ep(uint8_t ep, uint32_t type, uint16_t tx_addr, uint16_t rx_a
 	USBD_EP_SET_CONF(ep, type, tx_addr, rx_addr, rx_count);
 }
 
+/**
+ * @brief Initialize a single buffer unidirectional IN endpoint.
+ * @param ep Endpoint number.
+ * @param type Endpoint type.
+ * @param tx_addr The address offset of the endpoint's IN buffer inside the Packet Memory Area.
+ * @param ep_in Pointer to callback function that handles the IN transaction of the endpoint.
+ */
 void usbd_register_ep_tx(uint8_t ep, uint32_t type, uint32_t tx_addr, void (*ep_in)(void))
 {
 	ASSERT(ep < 8);
@@ -961,6 +1079,14 @@ void usbd_register_ep_tx(uint8_t ep, uint32_t type, uint32_t tx_addr, void (*ep_
 	USBD_EP_SET_CONF(ep, type, tx_addr, 0, 0);
 }
 
+/**
+ * @brief Initialize a single buffer unidirectional OUT endpoint.
+ * @param ep Endpoint number.
+ * @param type Endpoint type.
+ * @param rx_addr The address offset of the endpoint's OUT buffer inside the Packet Memory Area.
+ * @param rx_count The size of the endpoint's OUT buffer inside the Packet Memory Area.
+ * @param ep_out Pointer to callback function that handles the OUT transaction of the endpoint.
+ */
 void usbd_register_ep_rx(uint8_t ep, uint32_t type, uint32_t rx_addr, uint32_t rx_count, void (*ep_out)(void))
 {
 	ASSERT(ep < 8);
@@ -971,6 +1097,14 @@ void usbd_register_ep_rx(uint8_t ep, uint32_t type, uint32_t rx_addr, uint32_t r
 	USBD_EP_SET_CONF(ep, type, 0, rx_addr, rx_count);
 }
 
+/**
+ * @brief Initialize a double buffer unidirectional IN endpoint.
+ * @param ep Endpoint number.
+ * @param type Endpoint type.
+ * @param tx0_addr The address offset of the endpoint's IN 0 buffer inside the Packet Memory Area.
+ * @param tx1_addr The address offset of the endpoint's IN 1 buffer inside the Packet Memory Area.
+ * @param ep_in Pointer to callback function that handles the IN transaction of the endpoint.
+ */
 void usbd_register_ep_dbl_tx(uint8_t ep, uint32_t type, uint32_t tx0_addr, uint32_t tx1_addr, void (*ep_in)(void))
 {
 	ASSERT(ep < 8);
@@ -981,6 +1115,15 @@ void usbd_register_ep_dbl_tx(uint8_t ep, uint32_t type, uint32_t tx0_addr, uint3
 	USBD_EP_SET_DBL_TX_CONF(ep, type, tx0_addr, tx1_addr);
 }
 
+/**
+ * @brief Initialize a double buffer unidirectional OUT endpoint.
+ * @param ep Endpoint number.
+ * @param type Endpoint type.
+ * @param rx0_addr The address offset of the endpoint's OUT 0 buffer inside the Packet Memory Area.
+ * @param rx1_addr The address offset of the endpoint's OUT 1 buffer inside the Packet Memory Area.
+ * @param rx_count The size of the endpoint's OUT buffer inside the Packet Memory Area.
+ * @param ep_out Pointer to callback function that handles the OUT transaction of the endpoint.
+ */
 void usbd_register_ep_dbl_rx(uint8_t ep, uint32_t type, uint32_t rx0_addr, uint32_t rx1_addr, uint32_t rx_count, void (*ep_out)(void))
 {
 	ASSERT(ep < 8);
@@ -991,6 +1134,10 @@ void usbd_register_ep_dbl_rx(uint8_t ep, uint32_t type, uint32_t rx0_addr, uint3
 	USBD_EP_SET_DBL_RX_CONF(ep, type, rx0_addr, rx1_addr, rx_count);	
 }
 
+/**
+ * @brief Uninitialize an endpoint.
+ * @param ep Endpoint number.
+ */
 void usbd_unregister_ep(uint8_t ep)
 {
 	ASSERT(ep < 8);
@@ -998,7 +1145,6 @@ void usbd_unregister_ep(uint8_t ep)
 	ep_handler[ep][0] = NULL;
 	USBD_EP_CLEAR_CONF(ep);
 }
-
 
 /**
  * @brief Copy data from a buffer, to a usb sram memory buffer.
@@ -1072,21 +1218,17 @@ void usbd_prepare_data_in_stage(uint8_t* buf, uint32_t cnt)
 	ep0_cnt = cnt;
 	stage = usbd_data_in_stage;
 
-	//uint16_t ep_val = *USBD_EP_REG(EP0);
-	//uint16_t rx_flag;
 	if (ep0_cnt >= EP0_COUNT)
 	{
-		//rx_flag = USB_EP_STAT_RX_STALL;
+
 		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_STALL);
 	}
 	else
 	{
-		//rx_flag = USB_EP_STAT_RX_NAK;
 		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_NAK);
 	}
 	USBD_PMA_SET_TX_COUNT(EP0, MIN(EP0_COUNT, ep0_cnt));
 	usbd_pma_write(ep0_buf, ADDR0_TX, MIN(EP0_COUNT, ep0_cnt));
-	//*USBD_EP_REG(EP0) = USBD_EP_SET_TOGGLE(ep_val, (rx_flag | USB_EP_STAT_TX_VALID), (USB_EP_STAT_RX | USB_EP_STAT_TX));
 	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
@@ -1143,7 +1285,7 @@ void usbd_core_init(usbd_core_config_type *conf)
 	CLEAR(USB->CNTR, USB_CNTR_PDWN);
 
 	/*1 microsecond delay is needed for stm32l412 according to the datasheet.*/
-	cpu_busy_wait(1);
+	__cpu_busy_wait(1);
 
 	USB->BTABLE = 0;
 
@@ -1177,6 +1319,10 @@ void usbd_core_run(void)
 }
 #endif
 
+/**
+ * @brief Implementation of the weak function USB_IRQHandler.
+ * @param  
+ */
 void USB_IRQHandler(void)
 {
 #if USBD_CORE_EVENT_DRIVEN == 1

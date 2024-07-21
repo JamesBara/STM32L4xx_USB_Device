@@ -8,6 +8,11 @@ static __IO uint32_t tick;
 extern uint32_t SystemCoreClock;  /* System Core Clock Frequency */
 
 
+/**
+ * @brief Enable the hsi48 oscillator and set it as 
+ * select it as usb clock source.
+ * @param  
+ */
 void set_usbd_clk_src_hsi48(void)
 {
 	uint32_t s = 0;
@@ -25,6 +30,11 @@ void set_usbd_clk_src_hsi48(void)
 	CLEAR(RCC->CCIPR, RCC_CCIPR_CLK48SEL);
 }
 
+/**
+ * @brief Enable the external oscillator 
+ * and set the cpu frequency to 80Mhz.
+ * @param  
+ */
 void set_cpu_max_freq(void)
 {
 	uint32_t s = 0;
@@ -80,7 +90,10 @@ void set_cpu_max_freq(void)
 	SystemCoreClock = 80000000;
 }
 
-
+/**
+ * @brief Initalize clocks, gpio and interrupts.
+ * @param  
+ */
 void bsp_init(void)
 {
 	/*Enable Syscfg clock*/
@@ -129,16 +142,29 @@ void bsp_init(void)
 	NVIC_EnableIRQ(USB_IRQn);
 }
 
+/**
+ * @brief Increments the tick variable on each call.
+ * @param  
+ */
 void SysTick_Handler(void)
 {
 	++tick;
 }
 
+/**
+ * @brief Get the tick variable value.
+ * @param  
+ * @return tick value.
+ */
 uint32_t get_tick(void)
 {
 	return tick;
 }
 
+/**
+ * @brief Do nothing for a specified amount of time.
+ * @param timeout Amount of time to wait.
+ */
 void delay(uint32_t timeout)
 {
 	uint32_t s = tick;

@@ -3,7 +3,16 @@
 
 #include "stm32l4xx.h"
 
-static inline void assert_func(const char* file, int line, const char* func, const char* val)
+/**
+ * @brief Used by the ASSERT() macro. A software breakpoint is used in debug builds
+ * and a device reset in release builds.
+ * 
+ * @param file
+ * @param line 
+ * @param func 
+ * @param val 
+ */
+static inline void __assert_func(const char* file, int line, const char* func, const char* val)
 {
     UNUSED(file);
     UNUSED(line);
@@ -16,7 +25,10 @@ static inline void assert_func(const char* file, int line, const char* func, con
     #endif /*DEBUG*/
 }
 
-#define ASSERT(param) ((param) ? (void)0 : assert_func(__FILE__, __LINE__, __func__, #param))
+/************************************************
+ * @brief Custom assert Macro
+ ***********************************************/
+#define ASSERT(param) ((param) ? (void)0 : __assert_func(__FILE__, __LINE__, __func__, #param))
 
 
 #endif /*STM32_ASSERT_H*/

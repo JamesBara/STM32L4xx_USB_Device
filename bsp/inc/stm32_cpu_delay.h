@@ -5,7 +5,15 @@
 #include "stm32l4xx.h"
 
 
-__STATIC_FORCEINLINE void cpu_busy_wait(uint32_t max)
+/**
+ * @brief Do nothing for a specified amount of time.
+ * @param max Amount of time to wait.
+ * @note This function shouldn't be used under normal
+ * circumstances since it locks the cpu and causes it
+ * to spend cycles doing nothing.
+ * @return 
+ */
+__STATIC_FORCEINLINE void __cpu_busy_wait(uint32_t max)
 {
   __ASM volatile (
   ".syntax unified\n"
