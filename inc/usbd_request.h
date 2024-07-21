@@ -78,6 +78,7 @@
 #define USBD_LENGTH_CONFIGURATION_DESC 9
 #define USBD_LENGTH_INTERFACE_DESC 9
 #define USBD_LENGTH_ENDPOINT_DESC 7
+#define USBD_LENGTH_BOS_DESC 5
 
 /************************************************
  *	bDescriptorType
