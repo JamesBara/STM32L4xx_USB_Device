@@ -1,5 +1,5 @@
-#include "stm32_assert.h"
-#include "stm32_cpu_delay.h"
+#include "assert_stm32l4xx.h"
+#include "spinlock_stm32l4xx.h"
 #include "usbd_core.h"
 #include "usbd_request.h"
 #include "usbd_hw.h"
