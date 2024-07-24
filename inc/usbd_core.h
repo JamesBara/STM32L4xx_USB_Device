@@ -19,16 +19,13 @@
  * their own.
  ***********************************************/
 #ifndef ADDR0_TX
-    #define ADDR0_TX_OFFSET 64
-	#define ADDR0_TX ((uint16_t*) (PMA_BASE + ADDR0_TX_OFFSET))
+    #define ADDR0_TX 64
 #endif
 #ifndef ADDR0_RX
-    #define ADDR0_RX_OFFSET 128
-	#define ADDR0_RX ((uint16_t*) (PMA_BASE + ADDR0_RX_OFFSET))
+    #define ADDR0_RX 128
 #endif
 #ifndef COUNT0_RX 
-	#define COUNT0_RX USBD_FS_MAX_PACKET_SIZE
-	#define EP0_COUNT COUNT0_RX 
+	#define EP0_COUNT USBD_FS_MAX_PACKET_SIZE
 #endif
 
 /************************************************
@@ -79,8 +76,8 @@ void usbd_unregister_ep(uint8_t ep);
 /*******************************************************************************
  * Read/Write PMA functions.
  ******************************************************************************/
-void usbd_pma_read(uint16_t* src, uint8_t* dst, uint16_t cnt);
-void usbd_pma_write(uint8_t* src, uint16_t* dst, uint16_t cnt);
+void usbd_pma_read(uint16_t rx_addr, uint8_t* buf, uint16_t cnt);
+void usbd_pma_write(uint16_t tx_addr, uint8_t* buf, uint16_t cnt);
 
 /*******************************************************************************
  * Endpoint 0 related functions. Used for class, or vendor request

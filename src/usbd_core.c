@@ -55,7 +55,7 @@ static struct usbd_requests const *cur_state; /*!< Pointer to current state of t
 static struct usbd_requests const *prev_state; /*!< Pointer to previous state of the device.(Used to store the state when the device gets suspended)*/
 static uint16_t device_address; /*!< Stores the device address.*/
 static usbd_core_config_type *config; /*!< Pointer to the configuration provided by the user during initialization.*/
-static void (*ep_handler[8][2])(void); /*!< Pointer to stored endpoint callback functions.*/
+static void (*__IO ep_handler[8][2])(void); /*!< Pointer to stored endpoint callback functions.*/
 #if USBD_CORE_EVENT_DRIVEN == 1
 static void (*cur_ep_handler)(void);
 
@@ -803,7 +803,7 @@ static void usbd_reset(void)
 	{
 		usbd_unregister_ep(i);
 	}
-	usbd_register_ep(EP0, USB_EP_TYPE_CONTROL, ADDR0_TX_OFFSET, ADDR0_RX_OFFSET, EP0_COUNT, usbd_ep0_handler, usbd_ep0_handler);
+	usbd_register_ep(EP0, USB_EP_TYPE_CONTROL, ADDR0_TX, ADDR0_RX, EP0_COUNT, usbd_ep0_handler, usbd_ep0_handler);
 	ep0_buf = NULL;
 	ep0_cnt = 0;
 	cur_state = &default_state;
@@ -1148,24 +1148,22 @@ void usbd_unregister_ep(uint8_t ep)
 
 /**
  * @brief Copy data from a buffer, to a usb sram memory buffer.
- * @param src Pointer to uint8_t buffer, this is the buffer given.
- * @param dst Pointer to volatile uint16_t usb sram memory buffer, the pma address of an enpoint should be used.
+ * @param tx_addr Offset of the pma address of the enpoint to write to.
+ * @param buf Pointer to uint8_t buffer, this is the buffer to copy the data to.
  * @param cnt Amount of data to copy from buffer to usb sram buffer.
 */
-void usbd_pma_write(uint8_t* src, uint16_t* dst, uint16_t cnt)
+void usbd_pma_write(uint16_t tx_addr, uint8_t* buf, uint16_t cnt)
 {
-	uint16_t half_cnt, tmp_val;
-	half_cnt = (cnt >> 0x1U);
+	uint8_t* src = buf;
+	uint16_t half_cnt = (cnt >> 0x1U), tmp_val;
+	__IO uint16_t* dst = (__IO uint16_t*) (PMA_BASE + tx_addr);
 
 	/*Copy to packet buffer area.*/
 	while (half_cnt--)
 	{
-		tmp_val = (uint16_t)(*src);
-		src++;
-		tmp_val |= (((uint16_t)(*src)) << 0x8U);
-		*dst = tmp_val;
-		dst++;
-		src++;
+		tmp_val = (uint16_t)(*src++);
+		tmp_val |= (((uint16_t)(*src++)) << 0x8U);
+		*dst++ = tmp_val;
 	}
 
 	/*If the size is odd copy the leftover bytes.*/
@@ -1178,24 +1176,22 @@ void usbd_pma_write(uint8_t* src, uint16_t* dst, uint16_t cnt)
 
 /**
  * @brief Copy data from a usb sram memory buffer, to a buffer.
- * @param src Pointer to volatile uint16_t usb sram memory buffer, the pma address of an enpoint should be used.
- * @param dst Pointer to uint8_t buffer, this is the buffer to copy the data to.
+ * @param rx_addr Offset of the pma address of the enpoint to read from.
+ * @param buf Pointer to uint8_t buffer, this is the buffer to copy the data to.
  * @param cnt Amount of data to copy from usb sram buffer to buffer. There is no error checking in this function.
 */
-void usbd_pma_read(uint16_t* src, uint8_t* dst, uint16_t cnt)
+void usbd_pma_read(uint16_t rx_addr, uint8_t* buf, uint16_t cnt)
 {
-	uint16_t half_cnt, tmp_val;
-	half_cnt = (cnt >> 0x1U);
+	uint8_t* dst = buf;
+	uint16_t half_cnt = (cnt >> 0x1U), tmp_val;
+	__IO uint16_t* src = (__IO uint16_t*) (PMA_BASE + rx_addr);
 
 	/*Copy from packet buffer area.*/
 	while (half_cnt--)
 	{
-		tmp_val = *src;
-		*dst = (uint8_t)(tmp_val & 0xFFU);
-		dst++;
-		*dst = (uint8_t)((tmp_val & 0xFF00U) >> 0x8U);
-		src++;
-		dst++;
+		tmp_val = *src++;
+		*dst++ = (uint8_t)(tmp_val & 0xFFU);
+		*dst++ = (uint8_t)((tmp_val & 0xFF00U) >> 0x8U);
 	}
 
 	/*If the size is odd copy the leftover bytes.*/
@@ -1283,10 +1279,8 @@ void usbd_core_init(usbd_core_config_type *conf)
 	/*Prepare the hardware.*/
 	__IO uint16_t *reg = (uint16_t*)PMA_BASE;
 	CLEAR(USB->CNTR, USB_CNTR_PDWN);
-
 	/*1 microsecond delay is needed for stm32l412 according to the datasheet.*/
 	__spinlock(1);
-
 	USB->BTABLE = 0;
 
 	/*Clear the SRAM.*/

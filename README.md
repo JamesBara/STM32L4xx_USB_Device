@@ -2,7 +2,7 @@
 
 This project is a work in progress, it might contain bugs, errors or missing elements.
 
-This project depends on [STM32L4xx](https://github.com/JamesBara/STM32L4xx).
+This project depends on [STM32L4xx_USB_Device](https://github.com/JamesBara/STM32L4xx_USB_Device), [STM32L4xx](https://github.com/JamesBara/STM32L4xx) and [CMSIS_6]().
 
 
 File tree:

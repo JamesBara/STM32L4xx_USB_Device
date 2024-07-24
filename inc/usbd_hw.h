@@ -63,7 +63,7 @@
  ***********************************************/
 #define USBD_EP_SET_TOGGLE(reg, t_flags, t_masks) ((((reg) ^ (t_flags)) & (USBD_EP_RW | (t_masks))) | USBD_EP_RC_W0)
 
-#define USBD_EP_REG(ep) ((uint16_t*) (STM32L4xx_USB_EP_BASE + ((ep) << 0x2U))) /*!< Pointer to endpoint register. */
+#define USBD_EP_REG(ep) ((__IO uint16_t*) (STM32L4xx_USB_EP_BASE + ((ep) << 0x2U))) /*!< Pointer to endpoint register. */
 
 /*******************************************************************************
  * USBD Hardware Buffer Descriptor Table and Packet Memory Area 
@@ -93,9 +93,12 @@
  * @note x has to be multiple
  * of 2 or 32.
  ***********************************************/
-#define USBD_PMA_RX_COUNT_ALLOC(x) (((x) > 62) \
-    ? (uint16_t)(USBD_PMA_BLSIZE | ((((x) >> 0x5U) - 1) << USBD_PMA_NUM_BLOCK_Pos)) \
-	: (uint16_t)(((x) >> 0x1U) << USBD_PMA_NUM_BLOCK_Pos))
+#define USBD_PMA_RX_COUNT_ALLOC(x) (((uint16_t)(x) > 62) \
+    ? (uint16_t)(USBD_PMA_BLSIZE | ((((uint16_t)(x) >> 0x5U) - 1) << USBD_PMA_NUM_BLOCK_Pos)) \
+	: (uint16_t)(((uint16_t)(x) >> 0x1U) << USBD_PMA_NUM_BLOCK_Pos))
+
+
+#define USBD_PMA_REG_HELPER(ep, offset) (__IO uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + (offset))
 
 /************************************************
  * @brief Create the Buffer Descriptor Table by
@@ -112,10 +115,10 @@
  * set statically, it has fit the PMA
  * and not colide with other endpoints.
  ***********************************************/
-#define USBD_PMA_SET_TX0_ADDR(ep, addr) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U)) = (addr)
-#define USBD_PMA_SET_TX0_COUNT(ep, count) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + 0x2U) = ((count) & USBD_PMA_COUNT)
-#define USBD_PMA_SET_TX1_ADDR(ep, addr) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U)  + 0x4U) = (addr)
-#define USBD_PMA_SET_TX1_COUNT(ep, count) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + 0x6U) = ((count) & USBD_PMA_COUNT)
+#define USBD_PMA_SET_TX0_ADDR(ep, addr) *USBD_PMA_REG_HELPER(ep, 0) = ((uint16_t)(addr))
+#define USBD_PMA_SET_TX0_COUNT(ep, count) *USBD_PMA_REG_HELPER(ep, 2) = ((uint16_t)(count) & USBD_PMA_COUNT)
+#define USBD_PMA_SET_TX1_ADDR(ep, addr) *USBD_PMA_REG_HELPER(ep, 4) = ((uint16_t)(addr))
+#define USBD_PMA_SET_TX1_COUNT(ep, count) *USBD_PMA_REG_HELPER(ep, 6) = ((uint16_t)(count) & USBD_PMA_COUNT)
 #define USBD_PMA_SET_TX_ADDR(ep, addr) USBD_PMA_SET_TX0_ADDR(ep, addr)
 #define USBD_PMA_SET_TX_COUNT(ep, count) USBD_PMA_SET_TX0_COUNT(ep, count)
 
@@ -137,12 +140,12 @@
  * set statically, it has fit the PMA
  * and not colide with other endpoints.
  ***********************************************/
-#define USBD_PMA_SET_RX0_ADDR(ep, addr) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U)) = (addr)
-#define USBD_PMA_SET_RX0_COUNT(ep, count) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + 0x2U) = USBD_PMA_RX_COUNT_ALLOC(count)
-#define USBD_PMA_GET_RX0_COUNT(ep) ((*(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + 0x2U)) & USBD_PMA_COUNT)
-#define USBD_PMA_SET_RX1_ADDR(ep, addr) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + 0x4U) = (addr)
-#define USBD_PMA_SET_RX1_COUNT(ep, count) *(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + 0x6U) = USBD_PMA_RX_COUNT_ALLOC(count)
-#define USBD_PMA_GET_RX1_COUNT(ep) ((*(uint16_t*)(PMA_BASE + (USB->BTABLE) + ((ep) << 0x3U) + 0x6U)) & USBD_PMA_COUNT)
+#define USBD_PMA_SET_RX0_ADDR(ep, addr) *USBD_PMA_REG_HELPER(ep, 0) = ((uint16_t)(addr))
+#define USBD_PMA_SET_RX0_COUNT(ep, count) *USBD_PMA_REG_HELPER(ep, 2) = USBD_PMA_RX_COUNT_ALLOC(count)
+#define USBD_PMA_GET_RX0_COUNT(ep) ((*USBD_PMA_REG_HELPER(ep, 2)) & USBD_PMA_COUNT)
+#define USBD_PMA_SET_RX1_ADDR(ep, addr) *USBD_PMA_REG_HELPER(ep, 4) = ((uint16_t)(addr))
+#define USBD_PMA_SET_RX1_COUNT(ep, count) *USBD_PMA_REG_HELPER(ep, 6) = USBD_PMA_RX_COUNT_ALLOC(count)
+#define USBD_PMA_GET_RX1_COUNT(ep) ((*USBD_PMA_REG_HELPER(ep, 6)) & USBD_PMA_COUNT)
 #define USBD_PMA_SET_RX_ADDR(ep, addr) USBD_PMA_SET_RX1_ADDR(ep, addr)
 #define USBD_PMA_SET_RX_COUNT(ep, count) USBD_PMA_SET_RX1_COUNT(ep, count)
 #define USBD_PMA_GET_RX_COUNT(ep) USBD_PMA_GET_RX1_COUNT(ep)
@@ -167,7 +170,6 @@
 	GET(ep_val, USB_EP_CTR_RX) ? CLEAR(ep_val, USB_EP_CTR_RX) : SET(ep_val, USB_EP_CTR_RX); \
 	GET(ep_val, USB_EP_CTR_TX) ? CLEAR(ep_val, USB_EP_CTR_TX) : SET(ep_val, USB_EP_CTR_TX); \
 	*USBD_EP_REG(ep) = ep_val; \
-	__NOP(); \
 }while(0)
 
  /************************************************
@@ -187,7 +189,6 @@
 	USBD_PMA_SET_RX_ADDR(ep, rx_addr); \
 	USBD_PMA_SET_RX_COUNT(ep, rx_count); \
 	*USBD_EP_REG(ep) = USBD_EP_CONFIGURATION(ep_val, type, 0, ep, (USB_EP_STAT_RX_VALID | USB_EP_STAT_TX_NAK), USBD_EP_T); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -200,7 +201,6 @@
 	USBD_PMA_SET_TX0_ADDR(ep, tx0_addr); \
 	USBD_PMA_SET_TX1_ADDR(ep, tx1_addr); \
 	*USBD_EP_REG(ep) = USBD_EP_CONFIGURATION(ep_val, type, USB_EP_KIND, ep, (USB_EP_STAT_TX_DISABLED | USB_EP_STAT_RX_DISABLED), USBD_EP_T); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -215,7 +215,6 @@
 	USBD_PMA_SET_RX1_ADDR(ep, rx1_addr); \
 	USBD_PMA_SET_RX0_COUNT(ep, rx_count); \
 	*USBD_EP_REG(ep) = USBD_EP_CONFIGURATION(ep_val, type, USB_EP_KIND, ep, (USB_EP_STAT_TX_DISABLED | USB_EP_STAT_RX_DISABLED), USBD_EP_T); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -226,7 +225,6 @@
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	if (GET(ep, USB_EP_STAT_TX) != USB_EP_STAT_TX_DISABLED) \
 	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, USB_EP_STAT_TX_STALL, USB_EP_STAT_TX); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -239,7 +237,6 @@
 	{ \
 		*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, USB_EP_STAT_RX_STALL, USB_EP_STAT_RX); \
 	}\
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -253,7 +250,6 @@
 	{ \
 		*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, USB_EP_STAT_TX_NAK, (USB_EP_STAT_TX | USB_EP_DTOG_TX)); \
 	} \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -267,7 +263,6 @@
 	{ \
 		*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, USB_EP_STAT_RX_VALID, (USB_EP_STAT_RX | USB_EP_DTOG_RX)); \
 	} \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -285,7 +280,6 @@
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, flag, USB_EP_STAT_TX); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -295,7 +289,6 @@
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	*USBD_EP_REG(ep) = USBD_EP_SET_TOGGLE(ep_val, flag, USB_EP_STAT_RX); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -308,7 +301,6 @@
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	*USBD_EP_REG(ep) = USBD_EP_SET_RW(ep_val, USB_EP_KIND); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -321,7 +313,6 @@
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	*USBD_EP_REG(ep) = USBD_EP_CLEAR_RW(ep_val, USB_EP_KIND); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -337,7 +328,6 @@
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	*USBD_EP_REG(ep) = USBD_EP_CLEAR_RC_W0(ep_val, USB_EP_CTR_RX); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -348,7 +338,6 @@
 { \
 	uint16_t ep_val = *USBD_EP_REG(ep); \
 	*USBD_EP_REG(ep) = USBD_EP_CLEAR_RC_W0(ep_val, USB_EP_CTR_TX); \
-	__NOP(); \
 }while(0)
 
 /************************************************
@@ -364,7 +353,6 @@
 { \
 	uint16_t ep_val = *USBD_EP_REG(EP0); \
 	*USBD_EP_REG(EP0) = USBD_EP_SET_TOGGLE(ep_val, (USB_EP_STAT_RX_STALL | USB_EP_STAT_TX_STALL), (USB_EP_STAT_RX | USB_EP_STAT_TX)); \
-	__NOP(); \
 }while(0)
 
 #endif /*USBD_HW_H*/
