@@ -229,7 +229,7 @@ static void usbd_data_in_stage(void)
 	ep0_buf += cnt;
 	/*Copy a packet to usb sram*/
 	USBD_PMA_SET_TX_COUNT(EP0, MIN(EP0_COUNT, ep0_cnt));
-	usbd_pma_write(ep0_buf, ADDR0_TX, MIN(EP0_COUNT, ep0_cnt));
+	usbd_pma_write(ADDR0_TX, ep0_buf, MIN(EP0_COUNT, ep0_cnt));
 	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
@@ -1224,7 +1224,7 @@ void usbd_prepare_data_in_stage(uint8_t* buf, uint32_t cnt)
 		USBD_EP_SET_STAT_RX(EP0, USB_EP_STAT_RX_NAK);
 	}
 	USBD_PMA_SET_TX_COUNT(EP0, MIN(EP0_COUNT, ep0_cnt));
-	usbd_pma_write(ep0_buf, ADDR0_TX, MIN(EP0_COUNT, ep0_cnt));
+	usbd_pma_write(ADDR0_TX, ep0_buf, MIN(EP0_COUNT, ep0_cnt));
 	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
