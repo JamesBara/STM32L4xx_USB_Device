@@ -51,8 +51,8 @@ static uint8_t *ep0_buf; /*!< Pointer to endpoint 0 buffer.*/
 static uint32_t ep0_cnt; /*!< endpoint 0 buffer data count.*/
 static void (*stage)(void); /*!< Pointer to current stage callback.*/
 static void (*reception_completed)(void); /*!< Stores a callback function, used to let the user know that a data reception in endpoint 0 has been completed. (Useful for class and/or vendor requests)*/
-static struct usbd_requests const *cur_state; /*!< Pointer to current state of the device.*/
-static struct usbd_requests const *prev_state; /*!< Pointer to previous state of the device.(Used to store the state when the device gets suspended)*/
+static struct usbd_requests const __IO *cur_state; /*!< Pointer to current state of the device.*/
+static struct usbd_requests const __IO *prev_state; /*!< Pointer to previous state of the device.(Used to store the state when the device gets suspended)*/
 static uint16_t device_address; /*!< Stores the device address.*/
 static usbd_core_config_type *config; /*!< Pointer to the configuration provided by the user during initialization.*/
 static void (*__IO ep_handler[8][2])(void); /*!< Pointer to stored endpoint callback functions.*/
@@ -998,13 +998,6 @@ static void usbd_irq_handler(void)
 	if (GET(istr, USB_ISTR_WKUP))
 	{
 		CLEAR(istr, USB_ISTR_WKUP);
-		/*Line noise detection*/
-		if (GET(USB->FNR, USB_FNR_RXDP))
-		{
-			SET(USB->CNTR, USB_CNTR_LPMODE);
-			return;
-		}
-		CLEAR(USB->CNTR, USB_CNTR_FSUSP);
 		cur_state = prev_state;
 		prev_state = NULL;
 		if (config->wakeup != NULL)
@@ -1018,8 +1011,6 @@ static void usbd_irq_handler(void)
 		CLEAR(istr, USB_ISTR_SUSP);
 		prev_state = cur_state;
 		cur_state = &suspended_state;
-		SET(USB->CNTR, USB_CNTR_FSUSP);
-		SET(USB->CNTR, USB_CNTR_LPMODE);
 		if (config->suspend != NULL)
 		{
 			config->suspend();
