@@ -50,14 +50,14 @@ struct usbd_core_driver
 	uint8_t *(*configuration_descriptor)(uint8_t index); /*!< Notifies the usbd_core of a configuration descriptor.*/
 	uint8_t *(*string_descriptor)(uint8_t index, uint16_t lang_id); /*!< Notifies the usbd_core of a string descriptor.*/
 	uint8_t *(*bos_descriptor)(void); /*!< Notifies the usbd_core of the bos descriptor.*/
-	void (*set_descriptor)(usbd_setup_packet_type setup); /*!< SET_DESCRIPTOR request callback.*/
+	void (*set_descriptor)(struct usbd_setup_packet_type setup); /*!< SET_DESCRIPTOR request callback.*/
 	uint8_t (*get_configuration)(void); /*!< Notifies the usbd_core of current configuration number.*/
 	bool (*is_configuration_valid)(uint8_t num); /*!< Notifies the usbd_core if the selected configuration is valid.*/
 	void (*set_configuration)(uint8_t num); /*!< Callback that sets a configuration.*/
 	uint8_t (*get_interface)(uint8_t num); /*!< Notifies the usbd_core of the alternative interface number for a selected interface.*/
 	void (*set_interface)(uint8_t num, uint8_t alt); /*!< Callback that sets an alternate interface for a selected interface.*/
-	void (*class_request)(usbd_setup_packet_type setup); /*!< type CLASS request callback.*/
-	void (*vendor_request)(usbd_setup_packet_type setup); /*!< type VENDOR request callback.*/
+	void (*class_request)(struct usbd_setup_packet_type setup); /*!< type CLASS request callback.*/
+	void (*vendor_request)(struct usbd_setup_packet_type setup); /*!< type VENDOR request callback.*/
 	void (*suspend)(void); /*!< Callback that suspends the device.*/
 	void (*wakeup)(void); /*!< Callback that wakesup the device.*/
 	void (*sof)(void); /*!< Callback for start of frame.*/
