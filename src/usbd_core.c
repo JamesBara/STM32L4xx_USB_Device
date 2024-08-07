@@ -1,76 +1,41 @@
 #include "assert_stm32l4xx.h"
 #include "spinlock_stm32l4xx.h"
 #include "usbd_core.h"
-#include "usbd_request.h"
-#include "usbd_hw.h"
-
-#if USBD_CORE_EVENT_DRIVEN == 1
-enum usbd_event
-{
-	NONE = 0,
-	RESET,
-	CTR,
-	SETUP,
-	SUSPEND,
-	WAKEUP,
-	PMAOVR,
-	SOF,
-	ESOF,
-	LPM_L1,
-	ERROR
-};
-#define USBD_MAX_EVENT 11
-#endif
 
 /************************************************
- * USB requests callbacks.
+ * USB request callbacks.
  * These callbacks vary per state.
  ***********************************************/
-struct usbd_requests
+struct usbd_core_state
 {
-	void (*get_status)(usbd_setup_packet_type setup);
-	void (*clear_feature)(usbd_setup_packet_type setup);
-	void (*set_feature)(usbd_setup_packet_type setup);
-	void (*set_address)(usbd_setup_packet_type setup);
-	void (*get_descriptor)(usbd_setup_packet_type setup);
-	void (*set_descriptor)(usbd_setup_packet_type setup);
-	void (*get_configuration)(usbd_setup_packet_type setup);
-	void (*set_configuration)(usbd_setup_packet_type setup);
-	void (*get_interface)(usbd_setup_packet_type setup);
-	void (*set_interface)(usbd_setup_packet_type setup);
-	void (*synch_frame)(usbd_setup_packet_type setup);
-	void (*class_request)(usbd_setup_packet_type setup);
-	void (*vendor_request)(usbd_setup_packet_type setup);
+	void (*get_status)(struct usbd_setup_packet_type setup);
+	void (*clear_feature)(struct usbd_setup_packet_type setup);
+	void (*set_feature)(struct usbd_setup_packet_type setup);
+	void (*set_address)(struct usbd_setup_packet_type setup);
+	void (*get_descriptor)(struct usbd_setup_packet_type setup);
+	void (*set_descriptor)(struct usbd_setup_packet_type setup);
+	void (*get_configuration)(struct usbd_setup_packet_type setup);
+	void (*set_configuration)(struct usbd_setup_packet_type setup);
+	void (*get_interface)(struct usbd_setup_packet_type setup);
+	void (*set_interface)(struct usbd_setup_packet_type setup);
+	void (*synch_frame)(struct usbd_setup_packet_type setup);
+	void (*class_request)(struct usbd_setup_packet_type setup);
+	void (*vendor_request)(struct usbd_setup_packet_type setup);
 };
 
 /************************************************
  * Static variables and callbacks 
- * used by the usb core.
+ * used by the usbd core.
  ***********************************************/
 static uint8_t *ep0_buf; /*!< Pointer to endpoint 0 buffer.*/
-static uint32_t ep0_cnt; /*!< endpoint 0 buffer data count.*/
-static void (*stage)(void); /*!< Pointer to current stage callback.*/
-static void (*reception_completed)(void); /*!< Stores a callback function, used to let the user know that a data reception in endpoint 0 has been completed. (Useful for class and/or vendor requests)*/
-static struct usbd_requests const __IO *cur_state; /*!< Pointer to current state of the device.*/
-static struct usbd_requests const __IO *prev_state; /*!< Pointer to previous state of the device.(Used to store the state when the device gets suspended)*/
+static __IO uint32_t ep0_cnt; /*!< endpoint 0 buffer data count.*/
+static void (*__IO stage)(void); /*!< Pointer to current stage callback.*/
+static void (*__IO reception_completed)(void); /*!< Stores a callback function, used to let the user know that a data reception in endpoint 0 has been completed. (Useful for class and/or vendor requests)*/
+static struct usbd_core_state const __IO *cur_state; /*!< Pointer to current state of the device.*/
+static struct usbd_core_state const __IO *prev_state; /*!< Pointer to previous state of the device.(Used to store the state when the device gets suspended)*/
 static uint16_t device_address; /*!< Stores the device address.*/
-static usbd_core_config_type *config; /*!< Pointer to the configuration provided by the user during initialization.*/
+static struct usbd_core_driver* __IO drv; /*!< Pointer to the configuration provided by the user during initialization.*/
 static void (*__IO ep_handler[8][2])(void); /*!< Pointer to stored endpoint callback functions.*/
-#if USBD_CORE_EVENT_DRIVEN == 1
-static void (*cur_ep_handler)(void);
-
-static struct usbd_queue
-{
-	enum usbd_event buffer[USBD_MAX_EVENT + 1];
-	uint32_t head;
-	uint32_t tail;
-}queue;
-
-#define USBD_QUEUE_NEXT_HEAD() ((queue.head + 1 == USBD_MAX_EVENT) ? 0 : (queue.head + 1))
-#define USBD_QUEUE_NEXT_TAIL() ((queue.tail + 1 == USBD_MAX_EVENT) ? 0 : (queue.tail + 1))
-#define USBD_QUEUE_IS_EMPTY() ((queue.head == queue.tail) ? 1 : 0)
-#define USBD_QUEUE_IS_FULL() ((USBD_QUEUE_NEXT_HEAD() == queue.tail) ? 1 : 0)
-#endif
 
 /************************************************
  * Function prototypes.
@@ -82,37 +47,29 @@ static void usbd_data_in_stage(void);
 static void usbd_status_in_stage(void);
 static void usbd_status_out_stage(void);
 
-static void usbd_parse_setup_packet(usbd_setup_packet_type setup);
+static void usbd_parse_setup_packet(struct usbd_setup_packet_type setup);
 
-static void usbd_get_status(usbd_setup_packet_type setup);
-static void usbd_clear_feature(usbd_setup_packet_type setup);
-static void usbd_set_feature(usbd_setup_packet_type setup);
-static void usbd_set_address(usbd_setup_packet_type setup);
-static void usbd_get_descriptor(usbd_setup_packet_type setup);
-static void usbd_set_descriptor(usbd_setup_packet_type setup);
-static void usbd_get_configuration(usbd_setup_packet_type setup);
-static void usbd_set_configuration(usbd_setup_packet_type setup);
-static void usbd_get_interface(usbd_setup_packet_type setup);
-static void usbd_set_interface(usbd_setup_packet_type setup);
-static void usbd_synch_frame(usbd_setup_packet_type setup);
-static void usbd_class_request(usbd_setup_packet_type setup);
-static void usbd_vendor_request(usbd_setup_packet_type setup);
+static void usbd_get_status(struct usbd_setup_packet_type setup);
+static void usbd_clear_feature(struct usbd_setup_packet_type setup);
+static void usbd_set_feature(struct usbd_setup_packet_type setup);
+static void usbd_set_address(struct usbd_setup_packet_type setup);
+static void usbd_get_descriptor(struct usbd_setup_packet_type setup);
+static void usbd_set_descriptor(struct usbd_setup_packet_type setup);
+static void usbd_get_configuration(struct usbd_setup_packet_type setup);
+static void usbd_set_configuration(struct usbd_setup_packet_type setup);
+static void usbd_get_interface(struct usbd_setup_packet_type setup);
+static void usbd_set_interface(struct usbd_setup_packet_type setup);
+static void usbd_synch_frame(struct usbd_setup_packet_type setup);
+static void usbd_class_request(struct usbd_setup_packet_type setup);
+static void usbd_vendor_request(struct usbd_setup_packet_type setup);
 
 static void usbd_reset(void);
-
-#if USBD_CORE_EVENT_DRIVEN == 1
-static void usbd_event_enqueue(enum usbd_event e);
-static enum usbd_event usbd_event_dequeue(void);
-static void usbd_event_generator(void);
-static void usbd_device_event_handler(enum usbd_event e);
-#else
 static void usbd_irq_handler(void);
-#endif
 
 /************************************************
  * Request callbacks for default state.
  ***********************************************/
-static const struct usbd_requests default_state =
+static const struct usbd_core_state default_state =
 {
 	NULL,
 	NULL,
@@ -132,7 +89,7 @@ static const struct usbd_requests default_state =
 /************************************************
  * Request callbacks for address state.
  ***********************************************/
-static const struct usbd_requests addressed_state =
+static const struct usbd_core_state addressed_state =
 {
 	usbd_get_status,
 	usbd_clear_feature,
@@ -152,7 +109,7 @@ static const struct usbd_requests addressed_state =
 /************************************************
  * Request callbacks for configured state.
  ***********************************************/
-static const struct usbd_requests configured_state =
+static const struct usbd_core_state configured_state =
 {
 	usbd_get_status,
 	usbd_clear_feature,
@@ -172,7 +129,7 @@ static const struct usbd_requests configured_state =
 /************************************************
  * Request callbacks for suspended state.
  ***********************************************/
-static const struct usbd_requests suspended_state;
+static const struct usbd_core_state suspended_state;
 
 /**
  * @brief Endpoint 0 callback function.
@@ -190,7 +147,7 @@ static void usbd_ep0_handler(void)
  */
 static void usbd_setup_stage(void)
 {
-	usbd_setup_packet_type setup = {0};
+	struct usbd_setup_packet_type setup;
 	uint16_t count = USBD_PMA_GET_RX_COUNT(EP0);
 	
 	if(count != USBD_SETUP_PACKET_SIZE)
@@ -315,7 +272,7 @@ static void usbd_status_out_stage(void)
  * the current device state.
  * @param setup USB setup packet.
  */
-static void usbd_parse_setup_packet(usbd_setup_packet_type setup)
+static void usbd_parse_setup_packet(struct usbd_setup_packet_type setup)
 {
     switch(setup.bmRequestType & USBD_TYPE)
     {
@@ -472,7 +429,7 @@ static void usbd_parse_setup_packet(usbd_setup_packet_type setup)
  * @brief USB get status callback function.
  * @param setup USB setup packet.
  */
-static void usbd_get_status(usbd_setup_packet_type setup)
+static void usbd_get_status(struct usbd_setup_packet_type setup)
 {
 	uint8_t buf[2] = { 0x0U, 0x0U };
 
@@ -480,18 +437,18 @@ static void usbd_get_status(usbd_setup_packet_type setup)
 	{
 		case USBD_RECIPIENT_DEVICE:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->get_remote_wakeup != NULL);
-			ASSERT(config->is_selfpowered != NULL);
-			buf[0] = config->get_remote_wakeup() ? 1 << 1 : 0 << 1;
-			buf[0] |= config->is_selfpowered() ? 1 : 0;
+			ASSERT(drv != NULL);
+			ASSERT(drv->get_remote_wakeup != NULL);
+			ASSERT(drv->is_selfpowered != NULL);
+			buf[0] = drv->get_remote_wakeup() ? 1 << 1 : 0 << 1;
+			buf[0] |= drv->is_selfpowered() ? 1 : 0;
 			break;
 		}
 		case USBD_RECIPIENT_INTERFACE:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->is_interface_valid != NULL);
-			if(!config->is_interface_valid(setup.wIndex & 0x7FU))
+			ASSERT(drv != NULL);
+			ASSERT(drv->is_interface_valid != NULL);
+			if(!drv->is_interface_valid(setup.wIndex & 0x7FU))
 			{
 				USBD_EP0_SET_STALL();
 				return;
@@ -502,9 +459,9 @@ static void usbd_get_status(usbd_setup_packet_type setup)
 		{
 			uint8_t ep = (setup.wIndex & USBD_EP_ADDRESS_EP_NUMBER);
 			uint8_t dir =  (setup.wIndex & USBD_EP_ADDRESS_EP_DIRECTION) ? 1 : 0;
-			ASSERT(config != NULL);
-			ASSERT(config->is_endpoint_valid != NULL);
-			if(!config->is_endpoint_valid(ep, dir))
+			ASSERT(drv != NULL);
+			ASSERT(drv->is_endpoint_valid != NULL);
+			if(!drv->is_endpoint_valid(ep, dir))
 			{
 				USBD_EP0_SET_STALL();
 				return;
@@ -527,30 +484,30 @@ static void usbd_get_status(usbd_setup_packet_type setup)
  * @brief USB clear feature callback function.
  * @param setup USB setup packet.
  */
-static void usbd_clear_feature(usbd_setup_packet_type setup)
+static void usbd_clear_feature(struct usbd_setup_packet_type setup)
 {
 	switch (setup.bmRequestType & USBD_RECIPIENT)
 	{
 		case USBD_RECIPIENT_DEVICE:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->set_remote_wakeup != NULL);
-			config->set_remote_wakeup(false);
+			ASSERT(drv != NULL);
+			ASSERT(drv->set_remote_wakeup != NULL);
+			drv->set_remote_wakeup(false);
 			break;	
 		}
 		case USBD_RECIPIENT_ENDPOINT:
 		{
 			uint8_t ep = (setup.wIndex & USBD_EP_ADDRESS_EP_NUMBER);
 			uint8_t dir =  (setup.wIndex & USBD_EP_ADDRESS_EP_DIRECTION) ? 1 : 0;
-			ASSERT(config != NULL);
-			ASSERT(config->is_endpoint_valid != NULL);
-			if(!config->is_endpoint_valid(ep, dir))
+			ASSERT(drv != NULL);
+			ASSERT(drv->is_endpoint_valid != NULL);
+			if(!drv->is_endpoint_valid(ep, dir))
 			{
 				USBD_EP0_SET_STALL();
 				return;
 			}
-			ASSERT(config->clear_stall != NULL);
-			config->clear_stall(ep, dir);
+			ASSERT(drv->clear_stall != NULL);
+			drv->clear_stall(ep, dir);
 			break;
 		}
 		default:
@@ -567,24 +524,24 @@ static void usbd_clear_feature(usbd_setup_packet_type setup)
  * @brief USB set feature callback function.
  * @param setup USB setup packet.
  */
-static void usbd_set_feature(usbd_setup_packet_type setup)
+static void usbd_set_feature(struct usbd_setup_packet_type setup)
 {
 	switch (setup.bmRequestType & USBD_RECIPIENT)
 	{
 		case USBD_RECIPIENT_DEVICE:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->set_remote_wakeup != NULL);
-			config->set_remote_wakeup(true);
+			ASSERT(drv != NULL);
+			ASSERT(drv->set_remote_wakeup != NULL);
+			drv->set_remote_wakeup(true);
 			break;	
 		}
 		case USBD_RECIPIENT_ENDPOINT:
 		{
 			uint8_t ep = (setup.wIndex & USBD_EP_ADDRESS_EP_NUMBER);
 			uint8_t dir =  (setup.wIndex & USBD_EP_ADDRESS_EP_DIRECTION) ? 1 : 0;
-			ASSERT(config != NULL);
-			ASSERT(config->is_endpoint_valid != NULL);
-			if(!config->is_endpoint_valid(ep, dir))
+			ASSERT(drv != NULL);
+			ASSERT(drv->is_endpoint_valid != NULL);
+			if(!drv->is_endpoint_valid(ep, dir))
 			{
 				USBD_EP0_SET_STALL();
 				return;
@@ -613,7 +570,7 @@ static void usbd_set_feature(usbd_setup_packet_type setup)
  * @brief USB set address callback function.
  * @param setup USB setup packet.
  */
-static void usbd_set_address(usbd_setup_packet_type setup)
+static void usbd_set_address(struct usbd_setup_packet_type setup)
 {
 	device_address = setup.wValue;
 	usbd_prepare_status_in_stage();
@@ -623,7 +580,7 @@ static void usbd_set_address(usbd_setup_packet_type setup)
  * @brief USB get descriptor callback function.
  * @param setup USB setup packet.
  */
-static void usbd_get_descriptor(usbd_setup_packet_type setup)
+static void usbd_get_descriptor(struct usbd_setup_packet_type setup)
 {
 	uint8_t *buf = NULL;
 	uint32_t cnt = 0;
@@ -632,33 +589,33 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
 	{
 		case USBD_DESC_TYPE_DEVICE:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->device_descriptor != NULL);
-			buf = config->device_descriptor();
+			ASSERT(drv != NULL);
+			ASSERT(drv->device_descriptor != NULL);
+			buf = drv->device_descriptor();
 			cnt = MIN(setup.wLength, buf[0]);
 			break;
 		}
 		case USBD_DESC_TYPE_CONFIGURATION:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->configuration_descriptor != NULL);
-			buf = config->configuration_descriptor(setup.wValue & 0xFFU);
+			ASSERT(drv != NULL);
+			ASSERT(drv->configuration_descriptor != NULL);
+			buf = drv->configuration_descriptor(setup.wValue & 0xFFU);
 			cnt = MIN(setup.wLength, (buf[2] | buf[3] << 8));
 			break;
 		}
 		case USBD_DESC_TYPE_STRING:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->string_descriptor != NULL);
-			buf = config->string_descriptor((setup.wValue & 0xFFU), setup.wIndex);
+			ASSERT(drv != NULL);
+			ASSERT(drv->string_descriptor != NULL);
+			buf = drv->string_descriptor((setup.wValue & 0xFFU), setup.wIndex);
 			cnt = MIN(setup.wLength, buf[0]);
 			break;
 		}		
 		case USBD_DESC_TYPE_BOS:
 		{
-			ASSERT(config != NULL);
-			ASSERT(config->bos_descriptor != NULL);
-			buf = config->bos_descriptor();
+			ASSERT(drv != NULL);
+			ASSERT(drv->bos_descriptor != NULL);
+			buf = drv->bos_descriptor();
 			cnt = setup.wLength;
 			break;
 		}
@@ -676,24 +633,24 @@ static void usbd_get_descriptor(usbd_setup_packet_type setup)
  * @brief USB set descriptor callback function.
  * @param setup USB setup packet.
  */
-static void usbd_set_descriptor(usbd_setup_packet_type setup)
+static void usbd_set_descriptor(struct usbd_setup_packet_type setup)
 {
-	ASSERT(config != NULL);
-	ASSERT(config->set_descriptor != NULL);
-	config->set_descriptor(setup);
+	ASSERT(drv != NULL);
+	ASSERT(drv->set_descriptor != NULL);
+	drv->set_descriptor(setup);
 }
 
 /**
  * @brief USB get descriptor callback function.
  * @param setup USB setup packet.
  */
-static void usbd_get_configuration(usbd_setup_packet_type setup)
+static void usbd_get_configuration(struct usbd_setup_packet_type setup)
 {
 	UNUSED(setup);
 	uint8_t buf = 0;
-	ASSERT(config != NULL);
-	ASSERT(config->get_configuration != NULL);
-	buf = config->get_configuration();
+	ASSERT(drv != NULL);
+	ASSERT(drv->get_configuration != NULL);
+	buf = drv->get_configuration();
 	usbd_prepare_data_in_stage(&buf, USBD_GET_CONFIGURATION_LENGTH);
 }
 
@@ -701,18 +658,18 @@ static void usbd_get_configuration(usbd_setup_packet_type setup)
  * @brief USB set configuration callback function.
  * @param setup USB setup packet.
  */
-static void usbd_set_configuration(usbd_setup_packet_type setup)
+static void usbd_set_configuration(struct usbd_setup_packet_type setup)
 {
 	uint8_t num = (setup.wValue & 0xFFU);
-	ASSERT(config != NULL);
-	ASSERT(config->is_configuration_valid != NULL);
-	if(!config->is_configuration_valid(num))
+	ASSERT(drv != NULL);
+	ASSERT(drv->is_configuration_valid != NULL);
+	if(!drv->is_configuration_valid(num))
 	{
 		USBD_EP0_SET_STALL();
 		return;
 	}
-	ASSERT(config->set_configuration != NULL);
-	config->set_configuration(num);
+	ASSERT(drv->set_configuration != NULL);
+	drv->set_configuration(num);
 	cur_state = num ? &configured_state : &addressed_state;
 	usbd_prepare_status_in_stage();
 }
@@ -721,19 +678,19 @@ static void usbd_set_configuration(usbd_setup_packet_type setup)
  * @brief USB get interface callback function.
  * @param setup USB setup packet.
  */
-static void usbd_get_interface(usbd_setup_packet_type setup)
+static void usbd_get_interface(struct usbd_setup_packet_type setup)
 {
 	uint8_t num = (setup.wIndex & 0x7FU);
 	uint8_t buf = 0;
-	ASSERT(config != NULL);
-	ASSERT(config->is_interface_valid != NULL);
-	if(!config->is_interface_valid(num))
+	ASSERT(drv != NULL);
+	ASSERT(drv->is_interface_valid != NULL);
+	if(!drv->is_interface_valid(num))
 	{
 		USBD_EP0_SET_STALL();
 		return;
 	}
-	ASSERT(config->get_interface != NULL);
-	buf = config->get_interface(num);
+	ASSERT(drv->get_interface != NULL);
+	buf = drv->get_interface(num);
 	usbd_prepare_data_in_stage(&buf, USBD_GET_INTERFACE_LENGTH);
 }
 
@@ -741,56 +698,51 @@ static void usbd_get_interface(usbd_setup_packet_type setup)
  * @brief USB set interface callback function.
  * @param setup USB setup packet.
  */
-static void usbd_set_interface(usbd_setup_packet_type setup)
+static void usbd_set_interface(struct usbd_setup_packet_type setup)
 {
 	uint8_t num = (setup.wIndex & 0x7FU);
 	uint8_t alt = (setup.wValue & 0xFFU);
-	ASSERT(config != NULL);
-	ASSERT(config->is_interface_valid != NULL);
-	if (!config->is_interface_valid(num))
+	ASSERT(drv != NULL);
+	ASSERT(drv->is_interface_valid != NULL);
+	if (!drv->is_interface_valid(num))
 	{
 		USBD_EP0_SET_STALL();		
 	}
-	ASSERT(config->set_interface != NULL);
-	config->set_interface(num, alt);
+	ASSERT(drv->set_interface != NULL);
+	drv->set_interface(num, alt);
 	usbd_prepare_status_in_stage();	
 }
 
 /**
  * @brief USB synch frame callback function.
+ * @todo Unsure how to implement.
  * @param setup USB setup packet.
  */
-static void usbd_synch_frame(usbd_setup_packet_type setup)
+static void usbd_synch_frame(struct usbd_setup_packet_type setup)
 {
 	UNUSED(setup);
-	/*@todo*/
-	//uint8_t ep = (setup.wIndex & 0xFF);
-	//uint8_t buf[2];
-	/*@todo check if endpoint iso*/
-	/*@todo get frame number*/
-	//usbd_prepare_data_in_stage(buf, USBD_SYNCH_FRAME_LENGTH);
 }
 
 /**
  * @brief USB class specific request callback function.
  * @param setup USB setup packet.
  */
-static void usbd_class_request(usbd_setup_packet_type setup)
+static void usbd_class_request(struct usbd_setup_packet_type setup)
 {
-	ASSERT(config != NULL);
-	ASSERT(config->class_request != NULL);
-	config->class_request(setup);
+	ASSERT(drv != NULL);
+	ASSERT(drv->class_request != NULL);
+	drv->class_request(setup);
 }
 
 /**
  * @brief USB vendor specific request callback function.
  * @param setup USB setup packet.
  */
-static void usbd_vendor_request(usbd_setup_packet_type setup)
+static void usbd_vendor_request(struct usbd_setup_packet_type setup)
 {
-	ASSERT(config != NULL);
-	ASSERT(config->vendor_request != NULL);
-	config->vendor_request(setup);
+	ASSERT(drv != NULL);
+	ASSERT(drv->vendor_request != NULL);
+	drv->vendor_request(setup);
 }
 
 /**
@@ -809,155 +761,6 @@ static void usbd_reset(void)
 	cur_state = &default_state;
 	USB->DADDR = USB_DADDR_EF;
 }
-
-#if USBD_CORE_EVENT_DRIVEN == 1
-static void usbd_event_enqueue(enum usbd_event e)
-{
-	ASSERT(!USBD_QUEUE_IS_FULL());
-	queue.buffer[queue.head] = e;
-	queue.head = USBD_QUEUE_NEXT_HEAD();
-}
-
-static enum usbd_event usbd_event_dequeue(void)
-{
-	enum usbd_event e = NONE;
-	if (!USBD_QUEUE_IS_EMPTY())
-	{
-		e = queue.buffer[queue.tail];
-		queue.tail = USBD_QUEUE_NEXT_TAIL();
-	}
-	return e;
-}
-
-static void usbd_event_generator(void)
-{
-	enum usbd_event e = NONE;
-	uint32_t istr = USB->ISTR;
-
-	if (GET(istr, USB_ISTR_CTR))
-	{
-		uint8_t ep = GET(istr, USB_EP_EA);
-		uint8_t dir = GET(*USBD_EP_REG(ep), USB_EP_CTR_TX) ? 1 : 0;
-		ASSERT(ep_handler[ep][dir] != NULL);
-		if (dir)
-		{
-			USBD_EP_CLEAR_CTR_TX(ep);
-		}
-		else
-		{
-			USBD_EP_CLEAR_CTR_RX(ep);
-		}
-
-		cur_ep_handler = ep_handler[ep][dir];
-
-		e = CTR;
-		if (USBD_EP_GET_SETUP(ep))
-		{
-			e = SETUP;
-		}
-
-	}
-	else if (GET(istr, USB_ISTR_RESET))
-	{
-		CLEAR(istr, USB_ISTR_RESET);
-		e = RESET;
-	}
-	else if (GET(istr, USB_ISTR_WKUP))
-	{
-		CLEAR(istr, USB_ISTR_WKUP);
-		e = WAKEUP;
-	}
-	else if (GET(istr, USB_ISTR_SUSP))
-	{
-		CLEAR(istr, USB_ISTR_SUSP);
-		e = SUSPEND;
-	}
-	else if (GET(istr, USB_ISTR_SOF))
-	{
-		CLEAR(istr, USB_ISTR_SOF);
-		e = SOF;
-	}
-
-	usbd_event_enqueue(e);
-	USB->ISTR = istr;
-}
-
-static void usbd_device_event_handler(enum usbd_event e)
-{
-	switch (e)
-	{
-		case RESET:
-		{
-			usbd_reset();
-			break;
-		}
-		case SETUP:
-		{
-			/*Set setup stage.*/
-			stage = usbd_setup_stage;
-			/*fallthrough*/
-			__attribute__((fallthrough));
-		}
-		case CTR:
-		{
-			ASSERT(cur_ep_handler != NULL);
-			cur_ep_handler();
-			break;
-		}
-		case SUSPEND:
-		{
-			/*Store the cur_state state.*/
-			prev_state = cur_state;
-			cur_state = &suspended_state;
-			if (config->suspend != NULL)
-			{
-				config->suspend();
-			}
-			break;
-		}
-		case WAKEUP:
-		{
-
-			/*Line noise detection*/
-			if (GET(USB->FNR, USB_FNR_RXDP))
-			{
-				SET(USB->CNTR, USB_CNTR_LPMODE);
-				if (config->suspend != NULL)
-				{
-					config->suspend();
-				}
-				return;
-			}
-			/*Restore the cur_state state.*/
-			cur_state = prev_state;
-			prev_state = NULL;
-			CLEAR(USB->CNTR, USB_CNTR_FSUSP);
-			if (config->wakeup != NULL)
-			{
-				config->wakeup();
-			}
-			break;
-		}
-		case SOF:
-		{
-			if (config->sof != NULL)
-			{
-				config->sof();
-			}
-		}
-		case NONE:
-		{
-			/*Do nothing.*/
-			break;
-		}
-		default:
-		{
-			USBD_EP0_SET_STALL();
-			break;
-		}		
-	}
-}
-#else
 
 /**
  * @brief Handle the usb interrupts.
@@ -1000,9 +803,9 @@ static void usbd_irq_handler(void)
 		CLEAR(istr, USB_ISTR_WKUP);
 		cur_state = prev_state;
 		prev_state = NULL;
-		if (config->wakeup != NULL)
+		if (drv->wakeup != NULL)
 		{
-			config->wakeup();
+			drv->wakeup();
 		}
 	}
 
@@ -1011,9 +814,9 @@ static void usbd_irq_handler(void)
 		CLEAR(istr, USB_ISTR_SUSP);
 		prev_state = cur_state;
 		cur_state = &suspended_state;
-		if (config->suspend != NULL)
+		if (drv->suspend != NULL)
 		{
-			config->suspend();
+			drv->suspend();
 		}	
 
 	}	
@@ -1021,15 +824,14 @@ static void usbd_irq_handler(void)
 	if (GET(istr, USB_ISTR_SOF))
 	{
 		CLEAR(istr, USB_ISTR_SOF);
-		if (config->sof != NULL)
+		if (drv->sof != NULL)
 		{
-			config->sof();
+			drv->sof();
 		}
 	}
 
 	USB->ISTR = istr;
 }
-#endif
 
 /**
  * @brief Initialize a single buffer bidirectional endpoint.
@@ -1261,10 +1063,14 @@ void usbd_prepare_status_in_stage(void)
 	USBD_EP_SET_STAT_TX(EP0, USB_EP_STAT_TX_VALID);
 }
 
-void usbd_core_init(usbd_core_config_type *conf)
+/**
+ * @brief Initializes the usbd_core.
+ * @param core_driver Pointer to usbd_core_driver struct that provides callback implementations.
+ */
+void usbd_core_init(struct usbd_core_driver* core_driver)
 {
-	ASSERT(conf != NULL);
-	config = conf;
+	ASSERT(core_driver != NULL);
+	drv = core_driver;
 	cur_state = &default_state;
 
 	/*Prepare the hardware.*/
@@ -1290,29 +1096,11 @@ void usbd_core_init(usbd_core_config_type *conf)
 	SET(USB->BCDR, USB_BCDR_DPPU);
 }
 
-#if USBD_CORE_EVENT_DRIVEN == 1
-void usbd_core_run(void)
-{
-	uint32_t primask = __get_PRIMASK();
-	__disable_irq();
-	__ISB();
-	__DSB();
-	enum usbd_event e = usbd_event_dequeue();
-	__enable_irq();
-	__set_PRIMASK(primask);
-	usbd_device_event_handler(e);
-}
-#endif
-
 /**
  * @brief Implementation of the weak function USB_IRQHandler.
  * @param  
  */
 void USB_IRQHandler(void)
 {
-#if USBD_CORE_EVENT_DRIVEN == 1
-	usbd_event_generator();
-#else
 	usbd_irq_handler();
-#endif
 }

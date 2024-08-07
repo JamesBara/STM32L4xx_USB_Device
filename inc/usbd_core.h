@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "usbd_hw.h"
-#include "usbd_request.h"
+#include "usbd_desc.h"
 
 /*******************************************************************************
  * USBD core logic.
@@ -38,14 +38,14 @@
  * @todo Add other callbacks that might be missing.
  * 
  ***********************************************/
-typedef struct
+struct usbd_core_driver
 {
 	bool (*is_selfpowered)(void); /*!< Notifies the usbd_core if the device is selfpowered.*/
 	void (*set_remote_wakeup)(bool en); /*!< Callback that sets or clears remote wakeup.*/
-	bool (*get_remote_wakeup)(void); /*!< Notifies the usbd_core if the device is remote wakeup.*/
+	bool (*get_remote_wakeup)(void); /*!< Notifies the usbd_core if the device remote wakeup is enabled.*/
 	bool (*is_interface_valid)(uint8_t num); /*!< Notifies the usbd_core if the selected interface is valid.*/
 	bool (*is_endpoint_valid)(uint8_t num, uint8_t dir); /*!< Notifies the usbd_core if the selected endpoint is valid.*/
-    void (*clear_stall)(uint8_t num, uint8_t dir); /*!< CLEAR_STALL request callback. Resumes the endpoint handler.*/
+    void (*clear_stall)(uint8_t num, uint8_t dir); /*!< CLEAR_STALL request callback. Use it to resume an endpoint.*/
     uint8_t *(*device_descriptor)(void); /*!< Notifies the usbd_core of the device descriptor.*/
 	uint8_t *(*configuration_descriptor)(uint8_t index); /*!< Notifies the usbd_core of a configuration descriptor.*/
 	uint8_t *(*string_descriptor)(uint8_t index, uint16_t lang_id); /*!< Notifies the usbd_core of a string descriptor.*/
@@ -61,7 +61,7 @@ typedef struct
 	void (*suspend)(void); /*!< Callback that suspends the device.*/
 	void (*wakeup)(void); /*!< Callback that wakesup the device.*/
 	void (*sof)(void); /*!< Callback for start of frame.*/
-}usbd_core_config_type;
+};
 
 /*******************************************************************************
  * Endpoint configuration functions.
@@ -83,6 +83,7 @@ void usbd_pma_write(uint16_t tx_addr, uint8_t* buf, uint16_t cnt);
  * Endpoint 0 related functions. Used for class, or vendor request
  * handling.
  ******************************************************************************/
+
 void usbd_prepare_data_in_stage(uint8_t* buf, uint32_t cnt);
 void usbd_prepare_data_out_stage(uint8_t* buf, uint32_t cnt, void (*rx_cplt)(void));
 void usbd_prepare_status_in_stage(void);
@@ -90,9 +91,7 @@ void usbd_prepare_status_in_stage(void);
 /*******************************************************************************
  * Core functions to be used by main.
  ******************************************************************************/
-void usbd_core_init(usbd_core_config_type* conf);
-#if USBD_CORE_EVENT_DRIVEN == 1
-void usbd_core_run(void);
-#endif
+
+void usbd_core_init(struct usbd_core_driver* core_driver);
 
 #endif /*USBD_CORE_H*/

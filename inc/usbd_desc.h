@@ -1,8 +1,8 @@
-#ifndef USBD_REQUEST_H
-#define USBD_REQUEST_H
+#ifndef USBD_DESC_H
+#define USBD_DESC_H
 
 #include <stdint.h>
-#include "stm32l4xx.h"
+#include "cmsis_gcc.h"
 
 /*******************************************************************************
  * Setup Packet definitions
@@ -113,7 +113,12 @@
 /************************************************
  *	bmAttributes
  ***********************************************/
-#define USBD_ATTRIBUTES(selfpowered, remotewakeup) (0x80U | (((selfpowered) & 0x1U) << 6) | (((remotewakeup) & 0x1U) << 5))
+/************************************************
+ *	D7 : Reserved(set to one)
+ *  D6 : Self - powered
+ *  D5 : Remote Wakeup
+ ***********************************************/
+#define USBD_ATTRIBUTES_CONFIGURATION(D6, D5) (0x80U | (((D6) & 0x1U) << 6) | (((D5) & 0x1U) << 5))
 
 #define USBD_ATTRIBUTES_TRANSFER_TYPE_Pos 0
 #define USBD_ATTRIBUTES_TRANSFER_TYPE_Msk (0x3U << USBD_ATTRIBUTES_TRANSFER_TYPE_Pos)
@@ -178,7 +183,7 @@
 /************************************************
  *  Standard Device Descriptor
  ***********************************************/
-typedef struct
+struct __PACKED usbd_std_device_descriptor_type
 {
     uint8_t bLength;
     uint8_t bDescriptorType;
@@ -194,12 +199,12 @@ typedef struct
     uint8_t iProduct;
     uint8_t iSerialNumber;
     uint8_t bNumConfigurations;
-}__PACKED usbd_std_device_descriptor_type;
+};
 
 /************************************************
  *  Standard Configuration Descriptor
  ***********************************************/
-typedef struct
+struct __PACKED usbd_std_configuration_descriptor_type
 {
     uint8_t bLength;
     uint8_t bDescriptorType;
@@ -209,12 +214,12 @@ typedef struct
     uint8_t iConfiguration;
     uint8_t bmAttributes;
     uint8_t bMaxPower;
-}__PACKED usbd_std_configuration_descriptor_type;
+};
 
 /************************************************
  *  Standard Interface Descriptor
  ***********************************************/
-typedef struct
+struct __PACKED usbd_std_interface_descriptor_type
 {
     uint8_t bLength;
     uint8_t bDescriptorType;
@@ -225,12 +230,12 @@ typedef struct
     uint8_t bInterfaceSubClass;
     uint8_t bInterfaceProtocol;
     uint8_t iInterface;
-}__PACKED usbd_std_interface_descriptor_type;
+};
 
 /************************************************
  *  Standard Endpoint Descriptor
  ***********************************************/
-typedef struct
+struct __PACKED usbd_std_endpoint_descriptor_type
 {
     uint8_t bLength;
     uint8_t bDescriptorType;
@@ -238,32 +243,33 @@ typedef struct
     uint8_t bmAttributes;
     uint16_t wMaxPacketSize;
     uint8_t bInterval;
-}__PACKED usbd_std_endpoint_descriptor_type;
+};
 
 /************************************************
  *  Standard String Descriptor
  ***********************************************/
-typedef struct
+struct __PACKED usbd_std_string_descriptor_type
 {
     uint8_t bLength;
     uint8_t bDescriptorType;
-}__PACKED usbd_std_string_descriptor_type;
+    /*Data is not included in the struct.*/
+};
 
 /************************************************
  *  Standard BOS Descriptor
  ***********************************************/
-typedef struct
+struct __PACKED usbd_std_bos_descriptor_type
 {
     uint8_t bLength;
     uint8_t	bDescriptorType;
     uint16_t wLength;
     uint8_t bNumDeviceCaps;
-}__PACKED usbd_std_bos_descriptor_type;
+};
 
 /************************************************
  * Standard Platform Capability Descriptor
  ***********************************************/
-typedef struct
+struct __PACKED usbd_std_platform_capability_descriptor_type
 {
     uint8_t bLength;
     uint8_t	bDescriptorType;
@@ -271,18 +277,18 @@ typedef struct
     uint8_t bReserved;
     uint8_t PlatformCapabilityUUID[16];
     /*CapabilityData is not included in the struct.*/
-}__PACKED usbd_std_platform_capability_descriptor_type;
+};
 
 /************************************************
  *  Setup packet
  ***********************************************/
-typedef struct
+struct __PACKED usbd_setup_packet_type
 {
 	uint8_t bmRequestType;
 	uint8_t bRequest;
 	uint16_t wValue;
 	uint16_t wIndex;
 	uint16_t wLength;
-}__PACKED usbd_setup_packet_type;
+};
 
-#endif /*USBD_REQUEST_H*/
+#endif /*USBD_DESC_H*/
