@@ -10,9 +10,9 @@ File tree:
 STM32L4xx_USB_Device
 ├───STM32L4xx
 ├───inc
-│    ├───usbd_hw.h
-│    ├───usbd_request.h
-│    └───usbd_request.h
+│    ├───usbd_core.h
+│    ├───usbd_desc.h
+│    └───usbd_hw.h
 ├───src
 │    └───usbd_core.c
 ├───CMakeLists.txt
